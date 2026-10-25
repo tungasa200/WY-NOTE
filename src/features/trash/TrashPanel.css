@@ -1,0 +1,254 @@
+/* S-04 휴지통 + S-03 모양 확인 창. 색·간격은 tokens.css 변수만 쓴다. */
+.trash {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) var(--space-14);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+.trash-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.trash-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.trash-title {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-h1);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.trash-title:focus {
+  outline: none;
+}
+
+.trash-lede {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-secondary);
+}
+
+.trash-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.trash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.trash-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.trash-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.trash-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.trash-row-title.is-untitled {
+  color: var(--color-text-tertiary);
+}
+
+.trash-badge {
+  flex: none;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.trash-when {
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+}
+
+.trash-row-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.trash-empty,
+.trash-loading {
+  margin: 0;
+  padding: var(--space-6) var(--space-2);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-md);
+  color: var(--color-text-secondary);
+}
+
+.trash-error {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+
+/* 버튼(공통 버튼 컴포넌트가 생기면 그쪽으로 바꾼다) */
+.trash-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.trash-btn:hover {
+  background: var(--color-bg-hover);
+}
+
+.trash-btn:active {
+  background: var(--color-bg-active);
+}
+
+.trash-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.trash-btn:disabled,
+.trash-btn[aria-disabled="true"] {
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.trash-btn-danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-text-on-danger);
+  font-weight: var(--weight-semibold);
+}
+
+.trash-btn-danger:hover {
+  background: var(--color-danger-hover);
+}
+
+.trash-btn-danger[aria-disabled="true"] {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-text-on-danger);
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.trash-btn-danger-text {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-danger);
+}
+
+.trash-btn-danger-text:hover {
+  background: var(--color-danger-soft);
+}
+
+.trash-row .trash-btn {
+  height: 26px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.trash-row .trash-btn[aria-disabled="true"] {
+  cursor: progress;
+}
+
+/* 확인 창(S-03 모양) */
+.confirm-dialog {
+  position: fixed;
+  inset: 22vh auto auto 50%;
+  transform: translateX(-50%);
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-dialog);
+  font-family: var(--font-sans);
+}
+
+.confirm-dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.confirm-title {
+  margin: 0 0 var(--space-2);
+  font-size: 16px;
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.confirm-body {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 560px) {
+  .trash {
+    padding: var(--space-6) var(--space-4) var(--space-10);
+  }
+
+  .trash-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .trash-row-actions {
+    grid-column: 1 / -1;
+  }
+}
