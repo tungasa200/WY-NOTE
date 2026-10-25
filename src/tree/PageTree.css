@@ -1,0 +1,209 @@
+/* 페이지 트리(S-02): 행 28px, 단계마다 16px 들여쓰기. */
+.tree-empty {
+  margin: var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+.tree-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--tree-row-height);
+  padding-left: calc(var(--depth) * var(--tree-indent));
+  padding-right: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.tree-row:focus-visible {
+  outline-offset: -2px;
+}
+
+/* 지금 열린 페이지 */
+.tree-row[aria-selected="true"] {
+  background: var(--color-bg-selected);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+.tree-twisty {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.tree-twisty[data-open] {
+  transform: rotate(90deg);
+}
+
+.tree-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-title[data-untitled] {
+  color: var(--color-text-tertiary);
+}
+
+.tree-rename {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-xs);
+  outline: 1px solid var(--color-accent);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+}
+
+.tree-actions {
+  display: none;
+  flex: none;
+  gap: var(--space-0-5);
+}
+
+.tree-row:hover .tree-actions {
+  display: flex;
+}
+
+.tree-actions button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.tree-actions button:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}
+
+/* 끌어 옮기기(F-01.4) */
+.tree-row[data-dragging] {
+  opacity: 0.45;
+}
+
+.tree-row[data-drop="inside"] {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-drop-indicator);
+}
+
+.tree-row[data-drop="before"]::before,
+.tree-row[data-drop="after"]::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--depth) * var(--tree-indent) + var(--space-1));
+  right: 0;
+  height: 2px;
+  background: var(--color-drop-indicator);
+  pointer-events: none;
+}
+
+.tree-row[data-drop="before"]::before {
+  top: -1px;
+}
+
+.tree-row[data-drop="after"]::before {
+  bottom: -1px;
+}
+
+/* 위치선 왼쪽 끝 작은 원 */
+.tree-row[data-drop="before"]::after,
+.tree-row[data-drop="after"]::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--depth) * var(--tree-indent));
+  width: 6px;
+  height: 6px;
+  box-sizing: border-box;
+  border: 2px solid var(--color-drop-indicator);
+  border-radius: 50%;
+  background: var(--color-bg-sidebar);
+  pointer-events: none;
+}
+
+.tree-row[data-drop="before"]::after {
+  top: -3px;
+}
+
+.tree-row[data-drop="after"]::after {
+  bottom: -3px;
+}
+
+/* ── 맥락 메뉴 ── */
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-popover);
+}
+
+.menu {
+  position: fixed;
+  min-width: 200px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--shadow-popover);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus {
+  background: var(--color-bg-hover);
+  outline: none;
+}
+
+.menu-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.menu-item[data-danger] {
+  color: var(--color-danger);
+}
+
+.menu-item kbd {
+  color: var(--color-text-tertiary);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--color-divider);
+}

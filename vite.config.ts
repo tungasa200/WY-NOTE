@@ -8,6 +8,9 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [react()],
 
+  // CSP img-src가 data:를 막으므로 작은 에셋도 data: URL로 넣지 않고 파일로 둔다.
+  build: { assetsInlineLimit: 0 },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
