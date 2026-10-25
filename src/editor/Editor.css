@@ -1,0 +1,161 @@
+/* 최소 스타일. 디자인 토큰(P1-2)이 나오면 바꾼다. */
+.editor {
+  min-height: 100%;
+}
+
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #ddd;
+  background: #fff;
+}
+
+.editor-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.editor-button,
+.editor-select {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.editor-button[aria-pressed="true"] {
+  background: #e8eefc;
+  border-color: #6b8de3;
+}
+
+/* 고대비 모드에서는 배경색이 사라지므로 눌림 상태를 테두리로 보인다. */
+@media (forced-colors: active) {
+  .editor-button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
+}
+
+.editor-button:disabled,
+.editor-select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.editor-button:focus-visible,
+.editor-select:focus-visible {
+  outline: 2px solid #3b6fe0;
+  outline-offset: 2px;
+}
+
+.editor-body {
+  --hit-size: 44px;
+  --checkbox-size: 18px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+  min-height: 60vh;
+  outline: none;
+  overflow-wrap: anywhere;
+}
+
+.editor-body pre {
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #f4f4f5;
+  font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+  font-size: 14px;
+  tab-size: 4;
+  overflow-x: auto;
+}
+
+.editor-body pre code {
+  font-family: inherit;
+  white-space: pre;
+}
+
+/* 체크리스트 */
+.editor-body ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 4px;
+}
+
+.editor-body ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.editor-body ul[data-type="taskList"] li > label {
+  position: relative;
+  flex: none;
+  margin-top: 2px;
+}
+
+/* 체크박스는 18px이지만 누르는 영역은 44px로 넓힌다. */
+.editor-body ul[data-type="taskList"] li > label::before {
+  content: "";
+  position: absolute;
+  inset: calc((var(--checkbox-size) - var(--hit-size)) / 2);
+}
+
+.editor-body ul[data-type="taskList"] li > label input {
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
+  cursor: pointer;
+}
+
+.editor-body ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-body ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: #777;
+  text-decoration: line-through;
+}
+
+/* 표 */
+.editor-body .tableWrapper {
+  overflow-x: auto;
+}
+
+.editor-body table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.editor-body th,
+.editor-body td {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  vertical-align: top;
+}
+
+.editor-body th {
+  background: #f4f4f5;
+  font-weight: 600;
+  text-align: left;
+}
+
+.editor-body th > p,
+.editor-body td > p {
+  margin: 0;
+}
+
+.editor-body .selectedCell {
+  background: #e8eefc;
+}
