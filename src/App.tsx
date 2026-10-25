@@ -1,12 +1,8 @@
-import { Editor } from "./editor/Editor";
+import { AppShell } from "./app/AppShell";
 import "./App.css";
 
 function App() {
-  return (
-    <main className="app">
-      <Editor />
-    </main>
-  );
+  return <AppShell />;
 }
 
 export default App;

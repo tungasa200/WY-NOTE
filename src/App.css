@@ -1,11 +1,10 @@
-/* 최소 기본 스타일. 디자인 토큰(P1-2)이 나오면 바꾼다. 글꼴은 Windows 기본 글꼴만 쓴다(NF-06). */
+/* 전역 기본. 색·글꼴·간격은 모두 토큰(src/styles/tokens.css)으로만 쓴다. 글꼴은 Windows 기본 글꼴만(NF-06). */
 :root {
-  color-scheme: light;
-  font-family: "Segoe UI", "Malgun Gothic", sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  color: #1a1a1a;
-  background-color: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-ui);
+  color: var(--color-text);
+  background-color: var(--color-bg);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -16,7 +15,81 @@ body,
   margin: 0;
 }
 
-.app {
-  height: 100%;
-  overflow-y: auto;
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-raised);
+}
+
+/* ── 공용 버튼 ── */
+.button {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.button:hover {
+  background: var(--color-bg-hover);
+}
+
+.button:active {
+  background: var(--color-bg-active);
+}
+
+.button-primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+
+.button-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.button-danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-text-on-danger);
+}
+
+.button-danger:hover {
+  background: var(--color-danger-hover);
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+:is(.button, .icon-button):disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
 }
