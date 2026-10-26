@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>wy-note MVP 목업</title>
+<title>wy-note MVP 목업 v0.2</title>
 <!-- 토큰은 앱과 같은 파일을 쓴다. 원격 글꼴·CDN 없음(NF-06). -->
 <link rel="stylesheet" href="../../src/styles/tokens.css">
 <style>
@@ -29,6 +29,7 @@ kbd {
   padding: 0 var(--space-1); border: 1px solid var(--color-border); border-radius: var(--radius-xs);
   background: var(--color-bg-raised); line-height: 18px;
 }
+.is-focus { outline: var(--focus-ring-width) solid var(--color-focus-ring); outline-offset: var(--focus-ring-offset); } /* 목업 전용: 처음 포커스 위치 표시 */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* 목업 전용: 화면 ID 표시(앱에는 없음) */
@@ -109,7 +110,7 @@ kbd {
 }
 .row:hover, .row.is-hover { background: var(--color-bg-hover); color: var(--color-text); }
 .row[aria-selected="true"] { background: var(--color-bg-selected); color: var(--color-text); font-weight: var(--weight-semibold); }
-.row .twist { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--radius-xs); color: var(--color-text-tertiary); flex: none; }
+.row .twist { width: var(--hit-target-min); height: var(--hit-target-min); display: grid; place-items: center; border-radius: var(--radius-xs); color: var(--color-text-tertiary); flex: none; }
 .row .twist:hover { background: var(--color-bg-active); color: var(--color-text); }
 .row .twist .ico { width: 12px; height: 12px; transition: transform var(--duration-fast) var(--ease-out); }
 .row[aria-expanded="true"] .twist .ico { transform: rotate(90deg); }
@@ -118,7 +119,7 @@ kbd {
 .row .name.untitled { color: var(--color-text-tertiary); }
 .row .acts { display: none; gap: var(--space-0-5); }
 .row:hover .acts, .row.is-hover .acts, .row.has-menu .acts { display: flex; }
-.row .acts .icon-btn { width: 22px; height: 22px; }
+.row .acts .icon-btn { width: var(--hit-target-min); height: var(--hit-target-min); }
 .row .excl { color: var(--color-text-tertiary); display: grid; }
 .row .excl .ico { width: 13px; height: 13px; }
 .row .rename { flex: 1; height: 22px; padding: 0 var(--space-1); font-size: var(--text-md); border: 1px solid var(--color-accent); border-radius: var(--radius-xs); background: var(--color-bg-raised); outline: none; box-shadow: 0 0 0 1px var(--color-accent); }
@@ -155,7 +156,7 @@ kbd {
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--color-bg); }
 .topbar { display: flex; align-items: center; gap: var(--space-2); height: var(--topbar-height); padding: 0 var(--space-3) 0 var(--space-4); flex: none; position: relative; }
 .crumbs { display: flex; align-items: center; gap: var(--space-1); min-width: 0; flex: 1; color: var(--color-text-tertiary); font-size: var(--text-sm); }
-.crumbs a { color: inherit; text-decoration: none; padding: var(--space-0-5) var(--space-1); border-radius: var(--radius-xs); white-space: nowrap; }
+.crumbs a { display: inline-flex; align-items: center; min-height: var(--hit-target-min); color: inherit; text-decoration: none; padding: var(--space-0-5) var(--space-1); border-radius: var(--radius-xs); white-space: nowrap; }
 .crumbs a:hover { background: var(--color-bg-hover); color: var(--color-text); }
 .crumbs .here { color: var(--color-text); }
 .crumbs .sep { color: var(--color-border-strong); }
@@ -168,7 +169,7 @@ kbd {
 .toggle-ai[aria-pressed="true"] { background: var(--color-bg-active); color: var(--color-text); }
 
 .scroll { flex: 1; overflow: auto; }
-.page { max-width: calc(var(--editor-max-width) + var(--editor-gutter) * 2); margin: 0 auto; padding: var(--space-8) var(--editor-gutter) 30vh; }
+.page { max-width: calc(var(--editor-max-width) + var(--editor-gutter) * 2); margin: 0 auto; padding: var(--space-8) var(--editor-gutter) var(--editor-bottom-space); }
 .page-title { font-size: var(--text-title); line-height: var(--leading-tight); font-weight: var(--weight-bold); margin: var(--space-6) 0 var(--space-4); letter-spacing: -0.01em; outline: none; }
 .page-title.empty::before { content: "제목 없음"; color: var(--color-text-tertiary); }
 
@@ -187,7 +188,7 @@ kbd {
   display: none; gap: 2px; color: var(--color-text-tertiary);
 }
 .blk:hover > .handle, .blk.is-hover > .handle { display: flex; }
-.handle .icon-btn { width: 22px; height: 24px; color: var(--color-text-tertiary); }
+.handle .icon-btn { width: var(--hit-target-min); height: var(--hit-target-min); color: var(--color-text-tertiary); }
 .handle .grip { cursor: grab; }
 .blk.is-hover { background: transparent; }
 .blk.is-picked { background: var(--color-accent-soft); border-radius: var(--radius-sm); }
@@ -204,7 +205,8 @@ kbd {
 .doc ul ul { list-style-type: circle; }
 .task { list-style: none; padding-left: var(--space-1) !important; }
 .task li { display: flex; gap: var(--space-2); align-items: flex-start; }
-.cb { flex: none; width: 16px; height: 16px; margin-top: calc((var(--text-body) * var(--leading-body) - 16px) / 2); border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-xs); background: var(--color-bg-raised); display: grid; place-items: center; }
+.cb { position: relative; flex: none; width: 16px; height: 16px; margin-top: calc((var(--text-body) * var(--leading-body) - 16px) / 2); border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-xs); background: var(--color-bg-raised); display: grid; place-items: center; }
+.cb::before { content: ""; position: absolute; inset: -4px; } /* 누르는 영역 24px */
 .cb.on { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-text-on-accent); }
 .cb .ico { width: 12px; height: 12px; stroke-width: 2.4; }
 .task li.done > span { color: var(--color-text-tertiary); text-decoration: line-through; text-decoration-color: var(--color-border-strong); }
@@ -214,21 +216,21 @@ kbd {
 /* 코드 */
 .code { position: relative; border-radius: var(--radius-md); background: var(--color-bg-sunken); border: 1px solid var(--color-divider); margin-top: var(--space-2) !important; }
 .code-bar { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1) var(--space-1) 0 var(--space-3); }
-.code-lang { display: inline-flex; align-items: center; gap: var(--space-1); height: 22px; padding: 0 var(--space-1-5); border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--color-text-tertiary); font-size: var(--text-xs); }
+.code-lang { display: inline-flex; align-items: center; gap: var(--space-1); height: var(--hit-target-min); padding: 0 var(--space-1-5); border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--color-text-tertiary); font-size: var(--text-xs); }
 .code-lang:hover { background: var(--color-bg-active); color: var(--color-text); }
-.code pre { margin: 0; padding: var(--space-1) var(--space-4) var(--space-3); font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--code-text); overflow-x: auto; tab-size: 2; }
+.code pre { margin: 0; padding: var(--space-1) var(--space-4) var(--space-3); font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--code-text); overflow-x: auto; tab-size: var(--code-tab-size); }
 .tk-k { color: var(--code-keyword); } .tk-s { color: var(--code-string); } .tk-c { color: var(--code-comment); }
 .tk-n { color: var(--code-number); } .tk-f { color: var(--code-function); } .tk-t { color: var(--code-type); }
 /* 표 */
-.table-wrap { position: relative; margin-top: var(--space-2) !important; padding-bottom: var(--space-5) !important; padding-right: var(--space-5) !important; }
+.table-wrap { position: relative; margin-top: var(--space-2) !important; padding-bottom: calc(var(--hit-target-min) + var(--space-1)) !important; padding-right: calc(var(--hit-target-min) + var(--space-1)) !important; }
 .doc table { border-collapse: collapse; width: 100%; font-size: var(--text-md); line-height: var(--leading-ui); }
 .doc th, .doc td { border: 1px solid var(--color-border); padding: var(--space-1-5) var(--space-2); text-align: left; vertical-align: top; }
 .doc th { background: var(--color-bg-sidebar); font-weight: var(--weight-semibold); color: var(--color-text-secondary); }
 .doc td.sel { box-shadow: inset 0 0 0 2px var(--color-accent); }
 .num { font-variant-numeric: tabular-nums; text-align: right !important; }
 .add-row, .add-col { position: absolute; display: grid; place-items: center; border: 0; border-radius: var(--radius-xs); background: var(--color-bg-hover); color: var(--color-text-tertiary); }
-.add-row { left: 0; right: var(--space-5); bottom: 0; height: 16px; }
-.add-col { top: 0; right: 0; bottom: var(--space-5); width: 16px; }
+.add-row { left: 0; right: calc(var(--hit-target-min) + var(--space-1)); bottom: 0; height: var(--hit-target-min); }
+.add-col { top: 0; right: 0; bottom: calc(var(--hit-target-min) + var(--space-1)); width: var(--hit-target-min); }
 .add-row:hover, .add-col:hover { background: var(--color-bg-active); color: var(--color-text); }
 /* 이미지 */
 .img { margin-top: var(--space-2) !important; }
@@ -373,7 +375,7 @@ mark { background: var(--color-mark); color: var(--color-text); border-radius: 2
 .empty p { color: var(--color-text-secondary); font-size: var(--text-md); margin: 0 0 var(--space-5); line-height: 1.6; }
 .empty ul { margin: var(--space-6) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
 .empty li { display: flex; justify-content: space-between; border-top: 1px solid var(--color-divider); padding-top: var(--space-2); }
-.toast { position: fixed; z-index: var(--z-toast); left: 50%; bottom: var(--space-6); transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); background: var(--color-text); color: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); font-size: var(--text-sm); }
+.toast { position: fixed; z-index: var(--z-toast); left: 50%; bottom: var(--space-6); transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); background: var(--color-text); color: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); font-size: var(--text-sm); max-width: 560px; }
 .toast .btn { height: 26px; background: transparent; color: inherit; border-color: transparent; font-weight: var(--weight-semibold); }
 .toast .btn:hover { background: rgba(127, 127, 127, 0.2); }
 
@@ -390,15 +392,22 @@ body[data-view="settings"] [data-show]:not([data-show~="settings"]),
 body[data-view="ai-states"] [data-show]:not([data-show~="ai-states"]),
 body[data-view="empty"] [data-show]:not([data-show~="empty"]),
 body[data-view="export"] [data-show]:not([data-show~="export"]),
-body[data-view="save-error"] [data-show]:not([data-show~="save-error"]) { display: none !important; }
-body[data-view="delete"] .overlay, body[data-view="search"] .overlay, body[data-view="export"] .overlay { display: block; }
-body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, body[data-view="search"] .search { display: block; }
+body[data-view="save-error"] [data-show]:not([data-show~="save-error"]),
+body[data-view="purge"] [data-show]:not([data-show~="purge"]),
+body[data-view="close-unsaved"] [data-show]:not([data-show~="close-unsaved"]),
+body[data-view="paste-notice"] [data-show]:not([data-show~="paste-notice"]) { display: none !important; }
+body[data-view="delete"] .overlay, body[data-view="search"] .overlay, body[data-view="export"] .overlay,
+body[data-view="purge"] .overlay, body[data-view="close-unsaved"] .overlay { display: block; }
+body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, body[data-view="search"] .search,
+body[data-view="purge"] .confirm.purge, body[data-view="close-unsaved"] .confirm.close { display: block; }
+.confirm ul.pages { margin: 0 0 var(--space-2); padding-left: var(--space-5); color: var(--color-text-secondary); font-size: var(--text-md); }
+.link-menu { left: 40px; top: 30px; min-width: 160px; }
 .flex-show { display: flex !important; }
 </style>
 </head>
 <body data-view="editor">
 
-<!-- 아이콘: 직접 그린 SVG(24 격자, 선 1.6). 앱에서는 아이콘 묶음 결정 전까지 같은 방식으로 쓴다. -->
+<!-- 아이콘: 직접 그린 SVG(24 격자, 선 1.6). 앱은 lucide-react로 확정(화면설계 공통 규칙의 대응표). -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
@@ -435,6 +444,8 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
   <symbol id="i-sub" viewBox="0 0 24 24"><path d="M6 4v9a3 3 0 0 0 3 3h10"/><path d="M15 12l4 4-4 4"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-imageoff" viewBox="0 0 24 24"><path d="M3 3l18 18M10.4 4.5h8.1a2 2 0 0 1 2 2v8.1M19.5 19.5h-14a2 2 0 0 1-2-2v-11"/><path d="M15 15l-4-4-5.5 5.5"/></symbol>
 </svg>
 
 <div class="app" id="app" data-ai="open">
@@ -452,7 +463,7 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
       <!-- 빈 상태(S-09)에서는 트리가 비고 안내 한 줄 -->
       <p data-show="empty" style="margin:0 var(--space-4);font-size:var(--text-sm);color:var(--color-text-tertiary)">아직 페이지가 없습니다.</p>
 
-      <ul class="tree" role="tree" aria-labelledby="tree-label" data-show="editor slash tree-menu tree-drag delete trash search settings ai-states export save-error">
+      <ul class="tree" role="tree" aria-labelledby="tree-label" data-show="editor slash tree-menu tree-drag delete trash search settings ai-states export save-error purge close-unsaved paste-notice">
         <li class="node" role="none">
           <div class="row" role="treeitem" aria-expanded="true" aria-level="1" style="--lvl:0">
             <span class="twist"><svg class="ico"><use href="#i-chev"/></svg></span><span class="name">업무</span>
@@ -502,7 +513,7 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
             <li class="node" role="none">
               <div class="row" role="treeitem" aria-level="2" aria-expanded="false" style="--lvl:1">
                 <span class="twist"><svg class="ico"><use href="#i-chev"/></svg></span>
-                <span class="name" data-show="editor slash tree-menu delete trash search settings ai-states export save-error">읽은 책</span>
+                <span class="name" data-show="editor slash tree-menu delete trash search settings ai-states export save-error purge close-unsaved paste-notice">읽은 책</span>
                 <input class="rename" data-show="tree-drag" value="2026년 읽은 책" aria-label="페이지 이름">
               </div>
             </li>
@@ -545,19 +556,19 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
   <main class="main">
     <div class="topbar">
       <nav class="crumbs" aria-label="경로">
-        <span data-show="editor slash tree-menu tree-drag delete search ai-states export save-error" style="display:contents">
+        <span data-show="editor slash tree-menu tree-drag delete search ai-states export save-error close-unsaved paste-notice" style="display:contents">
           <a href="#">업무</a><span class="sep">/</span><a href="#">회의록</a><span class="sep">/</span><span class="here">10월 4주 주간 회의</span>
         </span>
-        <span class="here" data-show="trash">휴지통</span>
+        <span class="here" data-show="trash purge">휴지통</span>
         <span class="here" data-show="settings">설정</span>
       </nav>
-      <span class="save" data-show="editor slash tree-menu tree-drag delete search ai-states export" role="status"><span class="dot"></span>저장됨</span>
-      <span class="save failed" data-show="save-error" role="status"><span class="dot"></span>저장 안 됨</span>
-      <button class="btn btn-ghost toggle-ai" aria-pressed="true" data-ai-toggle data-show="editor slash tree-menu tree-drag delete search ai-states export save-error"><svg class="ico"><use href="#i-panel"/></svg>AI</button>
-      <button class="icon-btn" aria-label="페이지 메뉴" data-show="editor slash tree-menu tree-drag delete search ai-states export save-error"><svg class="ico"><use href="#i-more"/></svg></button>
+      <span class="save" data-show="editor slash tree-menu tree-drag delete search ai-states export paste-notice" role="status"><span class="dot"></span>저장됨</span>
+      <span class="save failed" data-show="save-error close-unsaved" role="status"><span class="dot"></span>저장 안 됨</span>
+      <button class="btn btn-ghost toggle-ai" aria-pressed="true" data-ai-toggle data-show="editor slash tree-menu tree-drag delete search ai-states export save-error close-unsaved paste-notice"><svg class="ico"><use href="#i-panel"/></svg>AI</button>
+      <button class="icon-btn" aria-label="페이지 메뉴" data-show="editor slash tree-menu tree-drag delete search ai-states export save-error close-unsaved paste-notice"><svg class="ico"><use href="#i-more"/></svg></button>
     </div>
 
-    <div class="banner danger" role="alert" data-show="save-error" style="margin-bottom:var(--space-2)">
+    <div class="banner danger" role="alert" data-show="save-error close-unsaved" style="margin-bottom:var(--space-2)">
       <svg class="ico"><use href="#i-alert"/></svg>
       <span class="grow"><b>저장하지 못했습니다.</b> 디스크 공간이 부족합니다. 편집 내용은 그대로 있고 5초마다 다시 저장합니다.</span>
       <button class="btn">지금 다시 저장</button>
@@ -565,7 +576,7 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
 
     <div class="scroll">
       <!-- ── 편집 영역 S-06 ── -->
-      <article class="page" data-show="editor slash tree-menu tree-drag delete search ai-states export save-error">
+      <article class="page" data-show="editor slash tree-menu tree-drag delete search ai-states export save-error close-unsaved paste-notice">
         <h1 class="page-title" contenteditable="true" spellcheck="false">10월 4주 주간 회의</h1>
         <div class="doc">
           <h2 class="blk">안건</h2>
@@ -584,6 +595,10 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
             <li><span class="cb"></span><span>/ 메뉴 항목 정리</span></li>
             <li><span class="cb"></span><span>휴지통 복원 위치 규칙 확인</span></li>
           </ul>
+
+          <p class="blk">참고: <a href="#" title="https://tiptap.dev/docs/editor">TipTap 편집기 문서</a>
+            <span class="menu link-menu" role="menu" aria-label="링크 메뉴" data-show="paste-notice"><button class="menu-item is-active" role="menuitem"><svg class="ico"><use href="#i-link"/></svg>링크 복사</button></span>
+          </p>
 
           <!-- / 메뉴 S-06b -->
           <p class="blk" data-show="slash" style="position:relative">/<span class="placeholder">  블록 종류 검색</span>
@@ -656,7 +671,7 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
       </article>
 
       <!-- ── 휴지통 S-04 ── -->
-      <section class="view" data-show="trash" aria-labelledby="trash-h">
+      <section class="view" data-show="trash purge" aria-labelledby="trash-h">
         <div class="view-head">
           <div>
             <h1 id="trash-h">휴지통</h1>
@@ -746,12 +761,12 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
     </div>
 
     <!-- 기본: 질의응답 진행 중 -->
-    <div class="ai-tabs" role="tablist" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty">
+    <div class="ai-tabs" role="tablist" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty purge close-unsaved paste-notice">
       <button class="ai-tab" role="tab" aria-selected="false">요약</button>
       <button class="ai-tab" role="tab" aria-selected="false">다듬기</button>
       <button class="ai-tab" role="tab" aria-selected="true">질문</button>
     </div>
-    <div class="ai-body" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty">
+    <div class="ai-body" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty purge close-unsaved paste-notice">
       <div class="ai-target"><svg class="ico ico-sm"><use href="#i-page"/></svg>대상: 이 페이지 전체 · 1,284자</div>
       <div class="msg-q">이번 주에 정한 것만 정리해 줘</div>
       <div class="msg-a">
@@ -762,9 +777,9 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
       <div class="msg-q">그중 두 번째의 이유는?</div>
       <div class="msg-a"><span class="typing" aria-label="답을 받는 중"><i></i><i></i><i></i></span></div>
     </div>
-    <div class="ai-foot" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty">
+    <div class="ai-foot" data-show="editor slash tree-menu tree-drag delete trash search settings export save-error empty purge close-unsaved paste-notice">
       <div class="ai-input"><textarea rows="1" placeholder="이 노트에 대해 질문하기" aria-label="질문"></textarea><button class="btn" style="height:28px"><svg class="ico ico-sm"><use href="#i-stop"/></svg>중지</button></div>
-      <div class="ai-foot-row"><span>Enter 보내기 · Shift+Enter 줄바꿈</span><button class="btn btn-ghost" style="height:22px;padding:0 var(--space-1-5);font-size:var(--text-xs)">새 대화</button></div>
+      <div class="ai-foot-row"><span>Enter 보내기 · Shift+Enter 줄바꿈</span><button class="btn btn-ghost" style="height:var(--hit-target-min);padding:0 var(--space-1-5);font-size:var(--text-xs)">새 대화</button></div>
     </div>
 
     <!-- 상태 모음(ai-states 보기): 실제로는 한 번에 하나만 보인다 -->
@@ -799,7 +814,22 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
 <div class="dialog confirm del" role="alertdialog" aria-modal="true" aria-labelledby="del-h" aria-describedby="del-d">
   <h2 id="del-h">"회의록"을 휴지통으로 옮길까요?</h2>
   <p id="del-d">하위 페이지 <b>2개</b>도 함께 옮겨집니다. 휴지통에서 언제든 복원할 수 있습니다.</p>
-  <div class="acts"><button class="btn">취소</button><button class="btn btn-danger" autofocus>휴지통으로 이동</button></div>
+  <div class="acts"><button class="btn">취소</button><button class="btn btn-danger is-focus" autofocus>휴지통으로 이동</button></div>
+</div>
+
+<!-- 영구 삭제 확인(S-04, S-03 모양): 되돌릴 수 없어 처음 포커스는 취소 -->
+<div class="dialog confirm purge" role="alertdialog" aria-modal="true" aria-labelledby="purge-h" aria-describedby="purge-d">
+  <h2 id="purge-h">"옛 회의 메모"를 영구 삭제할까요?</h2>
+  <p id="purge-d">"옛 회의 메모"와 하위 페이지 <b>2개</b>, 첨부 이미지를 지웁니다. 되돌릴 수 없습니다.</p>
+  <div class="acts"><button class="btn is-focus" autofocus>취소</button><button class="btn btn-danger">영구 삭제</button></div>
+</div>
+
+<!-- 저장 못 한 채 닫기 S-12 -->
+<div class="dialog confirm close" role="alertdialog" aria-modal="true" aria-labelledby="close-h" aria-describedby="close-d">
+  <h2 id="close-h">저장하지 못한 내용이 있습니다</h2>
+  <p id="close-d">디스크 공간이 부족합니다. 그래도 닫으면 마지막 저장 뒤에 입력한 내용은 사라집니다.</p>
+  <ul class="pages"><li>10월 4주 주간 회의</li><li>운동 기록</li></ul>
+  <div class="acts"><button class="btn btn-danger-text">그래도 닫기</button><button class="btn btn-primary is-focus" autofocus>다시 저장</button></div>
 </div>
 
 <!-- 내보내기 S-11 -->
@@ -833,6 +863,9 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
 <!-- 휴지통 비우기 실행 후 / 복원 후 알림 S-04 -->
 <div class="toast" role="status" data-show="trash">"옛 회의 메모"를 복원했습니다. <button class="btn">열기</button></div>
 
+<!-- 넣지 않은 이미지 알림 S-13 -->
+<div class="toast" role="status" data-show="paste-notice"><svg class="ico"><use href="#i-imageoff"/></svg>이미지 4개 중 2개를 넣었습니다. SVG 1개, 20MB 초과 1개는 넣지 않았습니다.</div>
+
 <span class="mock-id" id="mock-id"></span>
 
 <script>
@@ -841,7 +874,9 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
     editor: "S-01 셸 · S-06 편집 영역", slash: "S-06b / 메뉴", "tree-menu": "S-02 트리 맥락 메뉴",
     "tree-drag": "S-02 끌기 · 이름 바꾸기", delete: "S-03 삭제 확인", trash: "S-04 휴지통",
     search: "S-05 검색", settings: "S-08 설정", "ai-states": "S-07 AI 패널 상태 모음",
-    empty: "S-09 빈 상태", export: "S-11 내보내기", "save-error": "S-10 저장 실패"
+    empty: "S-09 빈 상태", export: "S-11 내보내기", "save-error": "S-10 저장 실패",
+    purge: "S-04 영구 삭제 확인(처음 포커스 취소)", "close-unsaved": "S-12 저장 못 한 채 닫기",
+    "paste-notice": "S-13 넣지 않은 이미지 알림 · 링크 메뉴"
   };
   function apply() {
     const v = (location.hash.slice(1) || "editor");
@@ -856,9 +891,9 @@ body[data-view="delete"] .confirm.del, body[data-view="export"] .confirm.exp, bo
     document.querySelectorAll(".sb-row").forEach(r => r.classList.remove("is-current"));
     if (v === "tree-menu") document.querySelector("[data-menu-row]").classList.add("has-menu", "is-hover");
     if (v === "tree-drag") { document.querySelector("[data-dragging]").classList.add("is-dragging"); }
-    if (v === "trash") document.querySelector("[data-trash-row]").classList.add("is-current");
+    if (v === "trash" || v === "purge") document.querySelector("[data-trash-row]").classList.add("is-current");
     if (v === "settings") document.querySelector("[data-settings-row]").classList.add("is-current");
-    if (v === "trash" || v === "settings") document.querySelector('[aria-selected="true"].row')?.removeAttribute("aria-selected");
+    if (v === "trash" || v === "purge" || v === "settings") document.querySelector('[aria-selected="true"].row')?.removeAttribute("aria-selected");
   }
   addEventListener("hashchange", () => location.reload());
   apply();
