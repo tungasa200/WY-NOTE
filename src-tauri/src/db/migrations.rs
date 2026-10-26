@@ -3,11 +3,11 @@ use crate::error::{AppError, AppResult, ErrorKind};
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-pub const MIGRATIONS: &[&str] = &[V1];
+pub const MIGRATIONS: &[&str] = &[V1, V2];
 
 const V1: &str = r#"
 CREATE TABLE pages (
-  id            INTEGER PRIMARY KEY,
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
   parent_id     INTEGER REFERENCES pages(id) ON DELETE SET NULL,
   position      INTEGER NOT NULL,
   title         TEXT    NOT NULL DEFAULT '',
@@ -27,7 +27,7 @@ CREATE TRIGGER pages_ad AFTER DELETE ON pages BEGIN
 END;
 
 CREATE TABLE attachments (
-  id         INTEGER PRIMARY KEY,
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
   page_id    INTEGER REFERENCES pages(id) ON DELETE SET NULL,
   file_name  TEXT    NOT NULL UNIQUE,
   mime       TEXT    NOT NULL,
@@ -36,6 +36,17 @@ CREATE TABLE attachments (
 );
 
 CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+"#;
+
+/// 계약-DB v2 4.1절(AI 전송 제외·사용 기록).
+const V2: &str = r#"
+ALTER TABLE pages ADD COLUMN ai_exclude INTEGER NOT NULL DEFAULT 0 CHECK (ai_exclude IN (0, 1, 2));
+
+CREATE TABLE ai_usage (
+  day         TEXT    PRIMARY KEY,
+  calls       INTEGER NOT NULL DEFAULT 0,
+  input_chars INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
 "#;
 
 fn mig_err(e: impl std::fmt::Display) -> AppError {
@@ -89,17 +100,46 @@ mod tests {
     }
 
     #[test]
-    fn new_db_gets_v1_schema() {
+    fn new_db_gets_latest_schema() {
         let conn = crate::db::open_memory();
-        assert_eq!(version(&conn), 1);
+        assert_eq!(version(&conn), 2);
         let n: i64 = conn
             .query_row(
-                "SELECT count(*) FROM sqlite_master WHERE name IN ('pages','page_fts','attachments','app_state','pages_ad')",
+                "SELECT count(*) FROM sqlite_master
+                 WHERE name IN ('pages','page_fts','attachments','app_state','pages_ad','ai_usage','sqlite_sequence')",
                 [],
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(n, 5);
+        assert_eq!(n, 7);
+        let ai_exclude: i64 = conn
+            .query_row("SELECT count(*) FROM pragma_table_info('pages') WHERE name = 'ai_exclude'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(ai_exclude, 1);
+        let bad = conn.execute(
+            "INSERT INTO pages (position, content, created_at, updated_at, ai_exclude) VALUES (0, '{}', 0, 0, 3)",
+            [],
+        );
+        assert!(bad.is_err(), "ai_exclude는 0·1·2만");
+    }
+
+    /// 카드 1-①: 마지막 행을 지워도 그 번호를 다시 쓰지 않는다.
+    #[test]
+    fn ids_are_not_reused_after_delete() {
+        let conn = crate::db::open_memory();
+        for (table, insert) in [
+            ("pages", "INSERT INTO pages (position, content, created_at, updated_at) VALUES (0, '{}', 0, 0)"),
+            (
+                "attachments",
+                "INSERT INTO attachments (file_name, mime, byte_size, created_at) VALUES (random(), 'image/png', 1, 0)",
+            ),
+        ] {
+            conn.execute(insert, []).unwrap();
+            let first = conn.last_insert_rowid();
+            conn.execute(&format!("DELETE FROM {table} WHERE id = ?1"), [first]).unwrap();
+            conn.execute(insert, []).unwrap();
+            assert!(conn.last_insert_rowid() > first, "{table}");
+        }
     }
 
     #[test]
@@ -122,22 +162,22 @@ mod tests {
 
         // v2 적용: 백업이 생기고 버전이 올라간다
         let mut conn = Connection::open(&path).unwrap();
-        let v2 = [V1, "CREATE TABLE extra (a INTEGER);"];
+        let v2 = [V1, V2, "CREATE TABLE extra (a INTEGER);"];
         migrate(&mut conn, &v2, Some(&path)).unwrap();
-        assert_eq!(version(&conn), 2);
-        let bak = dir.join("wy-note.db.bak-v1");
+        assert_eq!(version(&conn), 3);
+        let bak = dir.join("wy-note.db.bak-v2");
         assert!(bak.exists());
         let bconn = Connection::open(&bak).unwrap();
-        assert_eq!(version(&bconn), 1);
+        assert_eq!(version(&bconn), 2);
         let v: String = bconn.query_row("SELECT value FROM app_state WHERE key='k'", [], |r| r.get(0)).unwrap();
         assert_eq!(v, "1");
         drop(bconn);
 
         // 실패하는 v3: 롤백되어 버전·스키마가 그대로
-        let v3 = [V1, "CREATE TABLE extra (a INTEGER);", "CREATE TABLE ok3 (a); THIS IS NOT SQL;"];
+        let v3 = [V1, V2, "CREATE TABLE extra (a INTEGER);", "CREATE TABLE ok3 (a); THIS IS NOT SQL;"];
         let err = migrate(&mut conn, &v3, Some(&path)).unwrap_err();
         assert_eq!(err.kind, ErrorKind::Migration);
-        assert_eq!(version(&conn), 2);
+        assert_eq!(version(&conn), 3);
         let ok3: i64 = conn
             .query_row("SELECT count(*) FROM sqlite_master WHERE name='ok3'", [], |r| r.get(0))
             .unwrap();

@@ -35,6 +35,10 @@ pub struct TrashItem {
     pub title: String,
     pub trashed_at: i64,
     pub descendant_count: i64,
+    pub parent_id: Option<i64>,
+    /// 최상위부터 부모까지의 제목. 최상위였으면 비어 있다.
+    pub path: Vec<String>,
+    pub restores_to_root: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -281,17 +285,57 @@ pub fn trash_page(conn: &mut Connection, id: i64) -> AppResult<TrashedCount> {
 pub fn list_trash(conn: &Connection) -> AppResult<Vec<TrashItem>> {
     let mut st = conn.prepare(
         "SELECT p.id, p.title, p.trashed_at,
-                (SELECT count(*) FROM pages c WHERE c.trash_root_id = p.id) - 1
+                (SELECT count(*) FROM pages c WHERE c.trash_root_id = p.id) - 1,
+                p.parent_id,
+                -- restores_in_place의 반대(SQL로 한 번에)
+                CASE WHEN p.parent_id IS NULL THEN p.position < 0
+                     ELSE NOT EXISTS(SELECT 1 FROM pages q WHERE q.id = p.parent_id AND q.trashed_at IS NULL) END
          FROM pages p
          WHERE p.trashed_at IS NOT NULL AND p.trash_root_id = p.id
          ORDER BY p.trashed_at DESC, p.id DESC",
     )?;
-    let rows = st
+    let mut items: Vec<TrashItem> = st
         .query_map([], |r| {
-            Ok(TrashItem { id: r.get(0)?, title: r.get(1)?, trashed_at: r.get(2)?, descendant_count: r.get(3)? })
+            Ok(TrashItem {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                trashed_at: r.get(2)?,
+                descendant_count: r.get(3)?,
+                parent_id: r.get(4)?,
+                path: Vec::new(),
+                restores_to_root: r.get(5)?,
+            })
         })?
         .collect::<Result<_, _>>()?;
-    Ok(rows)
+    for t in &mut items {
+        t.path = ancestor_titles(conn, t.parent_id)?;
+    }
+    Ok(items)
+}
+
+/// `page`와 그 조상의 제목을 최상위부터. 조상이 휴지통에 있어도 넣는다.
+fn ancestor_titles(conn: &Connection, page: Option<i64>) -> AppResult<Vec<String>> {
+    let Some(page) = page else { return Ok(Vec::new()) };
+    // 휴지통 항목마다 부르므로 캐시한다. depth 제한은 parent_id가 순환하는 깨진 DB에서 멈추지 않는 것을 막는다.
+    let mut st = conn.prepare_cached(
+        "WITH RECURSIVE anc(id, parent_id, title, depth) AS (
+           SELECT id, parent_id, title, 0 FROM pages WHERE id = ?1
+           UNION ALL
+           SELECT p.id, p.parent_id, p.title, anc.depth + 1 FROM pages p JOIN anc ON p.id = anc.parent_id
+           WHERE anc.depth < 1000
+         )
+         SELECT title FROM anc ORDER BY depth DESC",
+    )?;
+    let titles = st.query_map([page], |r| r.get(0))?.collect::<Result<_, _>>()?;
+    Ok(titles)
+}
+
+/// 복원하면 원래 자리로 가는가. 부모가 휴지통에 있거나 영구 삭제됐으면(position = -1 표시) 최상위로 간다.
+fn restores_in_place(conn: &Connection, parent: Option<i64>, pos: i64) -> AppResult<bool> {
+    match parent {
+        Some(p) => is_alive(conn, p),
+        None => Ok(pos >= 0),
+    }
 }
 
 /// 휴지통 묶음 꼭대기의 (trashed_at, trash_root_id)를 확인한다.
@@ -319,10 +363,7 @@ pub fn restore_page(conn: &mut Connection, id: i64) -> AppResult<ToRoot> {
         tx.query_row("SELECT parent_id, position FROM pages WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))?;
     tx.execute("UPDATE pages SET trashed_at = NULL, trash_root_id = NULL WHERE trash_root_id = ?1", [id])?;
     // 부모가 영구 삭제되면 FK가 parent_id를 NULL로 바꾸고, 삭제 때 position을 -1로 표시해 둔다.
-    let parent_ok = match parent {
-        Some(p) => is_alive(&tx, p)?,
-        None => pos >= 0,
-    };
+    let parent_ok = restores_in_place(&tx, parent, pos)?;
     let (to, at) = if parent_ok { (parent, pos) } else { (None, i64::MAX) };
     insert_at(&tx, to, id, at)?;
     tx.commit()?;
@@ -355,11 +396,21 @@ pub fn empty_trash(conn: &mut Connection) -> AppResult<(i64, Vec<String>)> {
     Ok((n as i64, files))
 }
 
+fn get_app_state(conn: &Connection, key: &str) -> AppResult<Option<String>> {
+    Ok(conn.query_row("SELECT value FROM app_state WHERE key = ?1", [key], |r| r.get(0)).optional()?)
+}
+
+fn set_app_state(conn: &Connection, key: &str, value: &str) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO app_state (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )?;
+    Ok(())
+}
+
 pub fn get_start_page_id(conn: &Connection) -> AppResult<Option<i64>> {
-    let last: Option<String> = conn
-        .query_row("SELECT value FROM app_state WHERE key = 'last_page_id'", [], |r| r.get(0))
-        .optional()?;
-    if let Some(id) = last.and_then(|v| v.parse::<i64>().ok()) {
+    if let Some(id) = get_app_state(conn, "last_page_id")?.and_then(|v| v.parse::<i64>().ok()) {
         if is_alive(conn, id)? {
             return Ok(Some(id));
         }
@@ -374,12 +425,33 @@ pub fn get_start_page_id(conn: &Connection) -> AppResult<Option<i64>> {
 }
 
 pub fn set_last_page(conn: &Connection, id: i64) -> AppResult<()> {
-    conn.execute(
-        "INSERT INTO app_state (key, value) VALUES ('last_page_id', ?1)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        [id.to_string()],
-    )?;
-    Ok(())
+    set_app_state(conn, "last_page_id", &id.to_string())
+}
+
+/// `set_ui_state`가 받는 객체의 최대 크기(직렬화한 바이트).
+const UI_STATE_MAX_BYTES: usize = 16 * 1024;
+
+/// 화면 상태(계약 v2, F-07). 내용은 화면이 정하고 Rust는 그대로 저장한다. 없으면 `{}`.
+pub fn get_ui_state(conn: &Connection) -> AppResult<Value> {
+    // 깨진 값이면 기본값으로 시작한다(화면 설정이라 데이터 손실이 아님).
+    Ok(get_app_state(conn, "ui_state")?
+        .and_then(|v| serde_json::from_str::<Value>(&v).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| Value::Object(Default::default())))
+}
+
+pub fn set_ui_state(conn: &Connection, state: &Value) -> AppResult<()> {
+    if !state.is_object() {
+        return Err(AppError::new(ErrorKind::InvalidInput, "화면 상태는 JSON 객체여야 합니다"));
+    }
+    let json = state.to_string();
+    if json.len() > UI_STATE_MAX_BYTES {
+        return Err(AppError::new(
+            ErrorKind::InvalidInput,
+            format!("화면 상태가 {}KB를 넘습니다({}바이트)", UI_STATE_MAX_BYTES >> 10, json.len()),
+        ));
+    }
+    set_app_state(conn, "ui_state", &json)
 }
 
 #[cfg(test)]
@@ -474,9 +546,13 @@ mod tests {
         assert_eq!(kids(&c, Some(a)), vec![s1, s2]);
         positions_dense(&c);
         assert!(list_tree(&c).unwrap().iter().all(|n| n.id != b && n.id != b1));
+        rename_page(&mut c, a, "부모").unwrap();
         let trash = list_trash(&c).unwrap();
         assert_eq!(trash.len(), 1);
         assert_eq!((trash[0].id, trash[0].descendant_count), (b, 2));
+        assert_eq!(trash[0].parent_id, Some(a));
+        assert_eq!(trash[0].path, vec!["부모".to_string()]);
+        assert!(!trash[0].restores_to_root);
         // 묶음 꼭대기가 아니면 복원·영구 삭제 거부, 휴지통 페이지 편집 거부
         assert_eq!(restore_page(&mut c, b1).unwrap_err().kind, ErrorKind::InvalidInput);
         assert_eq!(delete_page_permanently(&mut c, a).unwrap_err().kind, ErrorKind::InvalidInput);
@@ -497,9 +573,16 @@ mod tests {
         let a = new(&mut c, None);
         let child = new(&mut c, Some(a));
         let grand = new(&mut c, Some(child));
+        rename_page(&mut c, a, "A").unwrap();
+        rename_page(&mut c, child, "C").unwrap();
         trash_page(&mut c, child).unwrap(); // 하위 묶음을 먼저 따로 보냄
         trash_page(&mut c, a).unwrap();
-        assert_eq!(list_trash(&c).unwrap().len(), 2);
+        let trash = list_trash(&c).unwrap();
+        assert_eq!(trash.len(), 2);
+        let item = |id: i64| trash.iter().find(|t| t.id == id).unwrap();
+        // 부모 a가 휴지통에 있어도 경로는 보이고, 복원하면 최상위로 간다
+        assert_eq!((item(child).path.clone(), item(child).restores_to_root), (vec!["A".to_string()], true));
+        assert_eq!((item(a).path.clone(), item(a).restores_to_root), (vec![], false));
 
         // 부모가 아직 휴지통이면 최상위로
         assert!(restore_page(&mut c, child).unwrap().to_root);
@@ -519,7 +602,9 @@ mod tests {
         trash_page(&mut c, p2).unwrap();
         delete_page_permanently(&mut c, a).unwrap();
         delete_page_permanently(&mut c, p2).unwrap();
-        assert_eq!(list_trash(&c).unwrap().len(), 1);
+        let trash = list_trash(&c).unwrap();
+        assert_eq!(trash.len(), 1);
+        assert_eq!((trash[0].parent_id, trash[0].path.len(), trash[0].restores_to_root), (None, 0, true));
         assert_eq!(get_page(&c, c2).unwrap().parent_id, None);
         assert!(restore_page(&mut c, c2).unwrap().to_root);
         assert_eq!(kids(&c, None), vec![r, child, c2]);
@@ -575,5 +660,28 @@ mod tests {
         assert_eq!(get_start_page_id(&c).unwrap(), Some(a));
         set_expanded(&c, a, true).unwrap();
         assert_eq!(set_expanded(&c, b, true).unwrap_err().kind, ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn ui_state_round_trip_and_limits() {
+        let c = open_memory();
+        assert_eq!(get_ui_state(&c).unwrap(), serde_json::json!({}));
+        let st = serde_json::json!({"theme":"dark","sidebarWidth":240,"recentPageIds":[3,1]});
+        set_ui_state(&c, &st).unwrap();
+        assert_eq!(get_ui_state(&c).unwrap(), st);
+        // 통째로 바뀐다
+        set_ui_state(&c, &serde_json::json!({"aiPanelOpen":true})).unwrap();
+        assert_eq!(get_ui_state(&c).unwrap(), serde_json::json!({"aiPanelOpen":true}));
+
+        for bad in [serde_json::json!([1]), serde_json::json!("x"), serde_json::json!(null)] {
+            assert_eq!(set_ui_state(&c, &bad).unwrap_err().kind, ErrorKind::InvalidInput, "{bad}");
+        }
+        let big = serde_json::json!({"x": "a".repeat(UI_STATE_MAX_BYTES)});
+        assert_eq!(set_ui_state(&c, &big).unwrap_err().kind, ErrorKind::InvalidInput);
+        assert_eq!(get_ui_state(&c).unwrap(), serde_json::json!({"aiPanelOpen":true}));
+
+        // 깨진 값은 {}로
+        c.execute("UPDATE app_state SET value = 'not json' WHERE key = 'ui_state'", []).unwrap();
+        assert_eq!(get_ui_state(&c).unwrap(), serde_json::json!({}));
     }
 }

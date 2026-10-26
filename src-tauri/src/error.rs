@@ -10,6 +10,10 @@ pub enum ErrorKind {
     Db,
     Io,
     Migration,
+    /// 첨부가 20MB 초과(계약 v2)
+    FileTooLarge,
+    /// 허용 밖 이미지 형식(계약 v2)
+    UnsupportedType,
 }
 
 /// `{ kind, message }`로 직렬화된다. message에는 노트 본문을 넣지 않는다.

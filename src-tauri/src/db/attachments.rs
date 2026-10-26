@@ -11,8 +11,10 @@ const TYPES: &[(&str, &str)] = &[
     ("jpeg", "image/jpeg"),
     ("gif", "image/gif"),
     ("webp", "image/webp"),
-    ("svg", "image/svg+xml"),
 ];
+
+/// 첨부 한 개의 최대 크기(카드 2-②).
+pub const MAX_BYTES: usize = 20 * 1024 * 1024;
 
 pub fn mime_for(ext: &str) -> Option<&'static str> {
     TYPES.iter().find(|(e, _)| e.eq_ignore_ascii_case(ext)).map(|(_, m)| *m)
@@ -22,9 +24,15 @@ pub fn mime_for(ext: &str) -> Option<&'static str> {
 pub fn save_attachment(conn: &mut Connection, dir: &Path, page_id: i64, ext: &str, bytes: &[u8]) -> AppResult<String> {
     let ext = ext.to_ascii_lowercase();
     let mime = mime_for(&ext)
-        .ok_or_else(|| AppError::new(ErrorKind::InvalidInput, format!("지원하지 않는 이미지 형식: {ext}")))?;
+        .ok_or_else(|| AppError::new(ErrorKind::UnsupportedType, format!("지원하지 않는 이미지 형식: {ext}")))?;
     if bytes.is_empty() {
         return Err(AppError::new(ErrorKind::InvalidInput, "빈 파일입니다"));
+    }
+    if bytes.len() > MAX_BYTES {
+        return Err(AppError::new(
+            ErrorKind::FileTooLarge,
+            format!("이미지가 {}MB를 넘습니다({:.1}MB)", MAX_BYTES >> 20, bytes.len() as f64 / (1 << 20) as f64),
+        ));
     }
     let tx = conn.transaction()?;
     ensure_alive(&tx, page_id)?;
@@ -152,8 +160,15 @@ mod tests {
         let n2 = save_attachment(&mut c, &dir, a, "jpg", b"img2").unwrap();
         assert!(n1.ends_with(".png") && n2.ends_with(".jpg"));
         assert_eq!(fs::read(dir.join(&n1)).unwrap(), b"img1");
-        assert_eq!(save_attachment(&mut c, &dir, a, "exe", b"x").unwrap_err().kind, ErrorKind::InvalidInput);
+        assert_eq!(save_attachment(&mut c, &dir, a, "exe", b"x").unwrap_err().kind, ErrorKind::UnsupportedType);
         assert_eq!(save_attachment(&mut c, &dir, a, "png", b"").unwrap_err().kind, ErrorKind::InvalidInput);
+        for ext in ["svg", "SVG", "bmp", "ico", "heic"] {
+            assert_eq!(save_attachment(&mut c, &dir, a, ext, b"x").unwrap_err().kind, ErrorKind::UnsupportedType, "{ext}");
+        }
+        assert!(save_attachment(&mut c, &dir, b, "png", &vec![0; MAX_BYTES]).is_ok()); // b에 둬서 아래 a 정리 결과에 섞이지 않게
+        let big = save_attachment(&mut c, &dir, a, "png", &vec![0; MAX_BYTES + 1]).unwrap_err();
+        assert_eq!(big.kind, ErrorKind::FileTooLarge);
+        assert!(big.message.contains("20MB"));
         assert_eq!(save_attachment(&mut c, &dir, 999, "png", b"x").unwrap_err().kind, ErrorKind::NotFound);
 
         // n2는 b 본문에도 붙여 넣었다
