@@ -75,14 +75,53 @@ export const api: Backend = new Proxy({} as Backend, {
   get: (_t, name) => current()[name as keyof Backend],
 });
 
+/** 계약-AI 4.1: AI 화면의 기본 실패 문구. */
+export const AI_FAIL = "AI 요청이 실패했습니다";
+
 export function isAppError(e: unknown): e is AppError {
   return typeof e === "object" && e !== null && "kind" in e && "message" in e;
 }
 
-/** 화면에 띄울 짧은 이유. 개발자용 message는 보이지 않는다. */
-export function errorReason(e: unknown): string {
-  if (!isAppError(e)) return "알 수 없는 오류가 났습니다";
+/** AppError의 kind. kind가 없으면 null(message가 빠진 거부도 종류는 알아본다). */
+export function errorKind(e: unknown): AppError["kind"] | null {
+  return typeof e === "object" && e !== null && "kind" in e ? (e as AppError).kind : null;
+}
+
+/**
+ * 화면에 띄울 짧은 이유(계약-DB 8절, 계약-AI 4.1 "화면 안내"). 개발자용 message는 보이지 않는다.
+ * AppError가 아니거나 모르는 kind면 fallback(AI 화면은 AI_FAIL을 넘긴다).
+ */
+export function errorReason(e: unknown, fallback = "알 수 없는 오류가 났습니다"): string {
+  if (!isAppError(e)) return fallback;
   switch (e.kind) {
+    case "NoApiKey":
+      return "API 키가 없습니다";
+    case "Keyring":
+      return "자격 증명 관리자에 접근하지 못했습니다";
+    case "Offline":
+      return "인터넷에 연결할 수 없습니다";
+    case "AiTimeout":
+      return "응답 시간이 초과되었습니다";
+    case "AiAuth":
+      return "잘못된 키이거나 권한이 없는 키입니다";
+    case "AiCredit":
+      return "이번 달 크레딧 소진";
+    case "AiRateLimit":
+      return "요청이 너무 많습니다. 잠시 뒤 다시 시도하세요";
+    case "AiOverloaded":
+      return "AI 서버가 바쁩니다. 잠시 뒤 다시 시도하세요";
+    case "AiApi":
+      return AI_FAIL;
+    case "AiExcluded":
+      return "AI 전송 제외 페이지입니다";
+    case "AiDailyLimit":
+      return "오늘 호출 상한에 도달했습니다";
+    case "InputTooLong":
+      return "보낼 글이 20,000자를 넘습니다. 범위를 줄이세요";
+    case "AiBusy":
+      return "다른 AI 작업이 진행 중입니다";
+    case "Cancelled":
+      return "중지했습니다";
     case "NotFound":
       return "페이지를 찾을 수 없습니다";
     case "InvalidMove":
@@ -100,6 +139,6 @@ export function errorReason(e: unknown): string {
     case "UnsupportedType":
       return "PNG·JPG·GIF·WebP 이미지만 넣을 수 있습니다";
     default:
-      return "알 수 없는 오류가 났습니다";
+      return fallback;
   }
 }

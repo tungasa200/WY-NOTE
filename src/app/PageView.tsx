@@ -1,6 +1,6 @@
 // 편집 영역의 한 페이지: 제목 + 편집기(화면설계 S-06). 편집기는 Editor의 props(content, onChange)만 쓴다.
 import { useRef } from "react";
-import { Editor } from "../editor/Editor";
+import { Editor, type EditorInstance } from "../editor/Editor";
 import type { JSONContent, Page } from "../lib/db-types";
 
 type Props = {
@@ -11,9 +11,10 @@ type Props = {
   focusTitle: boolean;
   onTitleChange: (title: string) => void;
   onContentChange: (doc: JSONContent) => void;
+  onEditor?: (editor: EditorInstance, attached: boolean) => void;
 };
 
-export function PageView({ page, title, focusTitle, onTitleChange, onContentChange }: Props) {
+export function PageView({ page, title, focusTitle, onTitleChange, onContentChange, onEditor }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -37,7 +38,7 @@ export function PageView({ page, title, focusTitle, onTitleChange, onContentChan
         }}
       />
       <div ref={bodyRef} className="page-body">
-        <Editor content={page.content} onChange={onContentChange} autofocus={focusTitle ? false : "end"} />
+        <Editor content={page.content} onChange={onContentChange} autofocus={focusTitle ? false : "end"} onEditor={onEditor} />
       </div>
     </article>
   );
