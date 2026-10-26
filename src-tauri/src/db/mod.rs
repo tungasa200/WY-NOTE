@@ -1,4 +1,5 @@
 //! SQLite 계층. SQL·트랜잭션·평문 추출은 모두 이 모듈 안에 있다(계약-DB.md 0절).
+pub mod ai;
 pub mod attachments;
 pub mod migrations;
 pub mod pages;

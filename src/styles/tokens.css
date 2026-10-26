@@ -1,5 +1,5 @@
 /*
- * wy-note 디자인 토큰 (초안 v0.1, 2026-10-26, NOTE-design)
+ * wy-note 디자인 토큰 (v0.2, 2026-10-26, NOTE-design)
  * 원본 설계: docs/화면설계.md 의 "디자인 토큰" 절
  *
  * 쓰는 법
@@ -62,9 +62,10 @@
   --code-number: #a14a00;
   --code-function: #1f5f9e;
   --code-type: #24706a;
+  --code-tab-size: 2;                /* 코드 블록 탭 문자 폭(칸). tab-size: var(--code-tab-size) */
 
   /* ── 글꼴 ───────────────────────────────── */
-  /* Windows 기본: 라틴은 Segoe UI, 한글은 맑은 고딕으로 넘어간다. */
+  /* 시스템 글꼴로 확정(글꼴 파일을 앱에 넣지 않음). 라틴은 Segoe UI, 한글은 맑은 고딕으로 넘어간다. */
   --font-sans: "Segoe UI", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
   /* Windows 10에는 Cascadia가 없을 수 있어 Consolas로 넘어간다. 한글은 맑은 고딕. */
   --font-mono: "Cascadia Mono", Consolas, "Malgun Gothic", monospace;
@@ -128,10 +129,12 @@
   --topbar-height: 44px;
   --editor-max-width: 720px;     /* 본문 한 줄 약 45자(한글) */
   --editor-gutter: 72px;         /* 본문 왼쪽: 블록 손잡이 자리 */
+  --editor-bottom-space: 96px;   /* 본문 아래 여백: 마지막 줄 아래를 눌러 이어 쓰는 자리 */
   --tree-row-height: 28px;
   --tree-indent: 16px;
   --control-height: 30px;        /* 버튼·입력칸 */
   --control-height-sm: 24px;     /* 아이콘 버튼 */
+  --hit-target-min: 24px;        /* 누르는 영역 최소(WCAG 2.2 AA 2.5.8). 보이는 모양이 작으면 영역만 넓힌다 */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 

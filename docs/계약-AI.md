@@ -92,7 +92,7 @@ pub fn delete() -> Result<(), AppError>;               // NoEntry → Ok
 
 ### 2.5 화면으로 넘기는 방식: **Tauri Channel**
 - Tauri 문서: 이벤트 시스템은 "not designed for low latency or high throughput", Channel은 "designed to be fast and deliver ordered data". 조각 순서가 중요하므로 Channel을 쓴다. 추가 crate·플러그인은 없다(`tauri::ipc::Channel`, JS `Channel` from `@tauri-apps/api/core`).
-- 명령은 `Channel<AiEvent>` 인자를 받아 조각을 보내고, 끝나면 최종 결과로 resolve한다. 실패·취소는 reject(`AppError`)한다.
+- 명령은 `Channel<AiEvent>` 인자를 받아 조각을 보내고, 끝나면 최종 결과로 resolve한다. 한 `delta`는 네트워크 청크 하나에 든 `text_delta`들을 이어 붙인 것이다(IPC 횟수를 줄임). 화면은 받은 `text`를 순서대로 이어 붙이기만 하면 된다. 실패·취소는 reject(`AppError`)한다.
 
 ### 2.6 취소
 - 화면이 요청마다 `requestId`(`crypto.randomUUID()`)를 만들어 보낸다. Rust는 `tauri::async_runtime::spawn`으로 호출 작업을 띄우고 `requestId → JoinHandle`을 `State<Mutex<HashMap>>`에 둔다.
@@ -146,6 +146,7 @@ export type AiResult = {
 export type AiStatus = {
   hasKey: boolean;
   excluded: "none" | "self" | "ancestor";   // ancestor = 상위 페이지가 '하위 포함'으로 제외
+  excludeMode: "none" | "self" | "subtree"; // 이 페이지 자기의 설정값(ai_exclude 0/1/2). set_ai_exclude의 mode와 같은 값
   todayCalls: number;
   dailyLimit: number;
 };
@@ -158,9 +159,9 @@ export type AiTurn = { role: "user" | "assistant"; text: string };
 |---|---|---|---|---|
 | `ai_summarize` | `{ requestId, pageId, text, today, onEvent: Channel<AiEvent> }` | `AiResult` | haiku, `max_tokens` 1,024. `text`가 비면 `InvalidInput` | F-08.1 |
 | `ai_rewrite` | `{ requestId, pageId, text, today, onEvent }` | `AiResult` | sonnet, 16,000. 결과만 돌려준다. 노트에 반영하는 것은 화면이 사용자 "바꾸기" 뒤에 한다 | F-08.2 |
-| `ai_ask` | `{ requestId, pageId, context, history: AiTurn[], question, today, onEvent }` | `AiResult` | sonnet, 4,096. `context` = 보낼 때 시점의 본문 평문 또는 선택 영역. `history`는 화면이 이미 줄인 것. 대화는 저장하지 않는다(F-08.3) | F-08.3 |
+| `ai_ask` | `{ requestId, pageId, context, history: AiTurn[], question, today, onEvent }` | `AiResult` | sonnet, 4,096. `context` = 보낼 때 시점의 본문 평문 또는 선택 영역. `history`는 화면이 이미 줄인 것. `history`는 user·assistant가 번갈아 오는 쌍(짝수 개, user로 시작)이어야 하고, 어긋나거나 빈 `text`가 있으면 `InvalidInput`. 대화는 저장하지 않는다(F-08.3) | F-08.3 |
 | `ai_cancel` | `{ requestId }` | `void` | 2.6. 없는 id면 아무 일도 하지 않는다 | F-08.3 |
-| `get_ai_status` | `{ pageId: PageId \| null, today }` | `AiStatus` | 패널 상태를 한 번에 준다. `pageId`가 null이면 `excluded: "none"` | F-08, F-08.5 |
+| `get_ai_status` | `{ pageId: PageId \| null, today }` | `AiStatus` | 패널 상태를 한 번에 준다. `pageId`가 null이면 `excluded: "none"`, `excludeMode: "none"` | F-08, F-08.5 |
 | `set_ai_exclude` | `{ pageId, mode: "none" \| "self" \| "subtree" }` | `void` | `ai_exclude`를 0/1/2로 쓴다 | F-08.5 |
 | `set_ai_daily_limit` | `{ limit: number }` | `void` | 1~1000 밖이면 `InvalidInput` | F-08.5 |
 | `list_ai_usage` | `{ days?: number }` | `AiUsageDay[]` | 최근 `days`(기본 30)개 날짜, 최신순 | F-08.5 |
@@ -213,9 +214,10 @@ export type AiTurn = { role: "user" | "assistant"; text: string };
 - 이미지 링크는 화면(변환 담당 NOTE-frontend3)이 만든다: 깊이 d(내보내기 꼭대기 = 0)의 페이지는 `![](` + `../`×d + `images/<파일 이름>)`. 깊이만 알면 되고 Rust가 바꾼 파일 이름은 몰라도 된다. 링크 안의 공백·괄호는 화면이 `%20` 등으로 인코딩한다.
 - 파일 이름 바꾸기(Rust가 한다. 규칙이 Windows 파일 시스템에 묶여 있으므로):
   - `< > : " / \ | ? *`와 제어 문자는 `_`로 바꾼다. 끝의 `.`·공백은 지운다.
-  - `CON PRN AUX NUL COM1~9 LPT1~9`(확장자 앞부분 기준, 대소문자 무시)이면 뒤에 `_`를 붙인다.
+  - `CON PRN AUX NUL CONIN$ CONOUT$ COM0~9 COM¹²³ LPT0~9 LPT¹²³`(확장자 앞부분 기준, 대소문자 무시)이면 뒤에 `_`를 붙인다.
   - 빈 제목은 `제목 없음`. 길이는 100자로 자른다.
-  - 같은 폴더 안 형제끼리 대소문자를 무시하고 겹치면 ` (2)`, ` (3)`…을 붙인다. `.md`와 하위 폴더는 같은 이름을 쓴다.
+  - 같은 폴더 안 형제끼리 대소문자를 무시하고 겹치면 ` (2)`, ` (3)`…을 붙인다. `.md`와 하위 폴더는 같은 이름을 쓴다. 그래서 이름 하나는 `<이름>.md`와 `<이름>` 둘을 차지한다(형제 `x`와 `x.md`가 있으면 뒤의 것이 `x.md (2)`).
+  - 꼭대기 폴더 안의 `images`도 형제 이름으로 친다(꼭대기 제목이 `images`면 `images (2).md`·`images (2)\`).
 
 ### 5.3 명령
 ```ts
@@ -233,7 +235,8 @@ export type ExportResult =
 
 | 명령 | 인자 | 반환 | 규칙 | 기능 |
 |---|---|---|---|---|
-| `export_markdown` | `{ root: ExportNode, attachments: string[] }` | `ExportResult` | ① Rust가 폴더 선택 창을 띄운다(취소하면 `{ cancelled: true }`). ② 5.2대로 새 폴더를 만들고 `.md`를 UTF-8(BOM 없음)로 쓴다. ③ `attachments`의 각 이름은 `save_attachment`가 만든 모양(`<숫자>.<허용 확장자>`, 경로 구분자 없음)만 받고 그 밖은 `InvalidInput`. 데이터 폴더 `attachments\`에서 `images\`로 복사한다. 없는 파일은 건너뛰고 `missingImages`에 담는다. ④ 쓰다가 실패하면 `Io`로 reject하고, 만든 폴더는 지우지 않는다(사용자가 고른 곳의 파일을 앱이 지우지 않게) | F-06 |
+| `export_markdown` | `{ root: ExportNode, attachments: string[] }` | `ExportResult` | ① Rust가 폴더 선택 창을 띄운다(취소하면 `{ cancelled: true }`). ② 5.2대로 새 폴더를 만들고 `.md`를 UTF-8(BOM 없음)로 쓴다. ③ `attachments`의 각 이름은 `save_attachment`가 만든 모양(`<숫자>.<허용 확장자>`, 경로 구분자 없음)만 받고 그 밖은 `InvalidInput`. 데이터 폴더 `attachments\`에서 `images\`로 복사한다. 없는 파일은 건너뛰고 `missingImages`에 담는다. ④ 쓰다가 실패하면 `Io`로 reject하고, 만든 폴더는 지우지 않는다(사용자가 고른 곳의 파일을 앱이 지우지 않게). ⑤ 성공하면 만든 폴더를 "마지막 내보내기 폴더"로 기억한다(메모리에만, 앱을 다시 켜면 비어 있음) | F-06 |
+| `open_export_dir` | 없음 | `void` | 마지막 내보내기 폴더만 탐색기로 연다. 화면은 경로를 넘기지 않는다. 기억한 경로가 없거나 그 폴더가 없어졌으면 `NotFound`, 열기 실패는 `Io`. opener 플러그인의 Rust API로 열어 capability의 opener 범위는 넓히지 않는다 | F-06 |
 
 - 하위 페이지 본문은 화면이 `get_page`로 읽어 변환한 뒤 한 번에 넘긴다. 페이지 1,000개·1,000만 자(NF-04 시험 규모)여도 IPC 한 번에 약 10MB 남짓이라 감당할 만하다고 본다(구현 때 잰다).
 - "마크다운으로 표현되지 않는 정보" 알림(F-06)은 변환한 화면이 모아 보여 준다. Rust 결과의 `missingImages`도 함께 보여 준다.
@@ -241,7 +244,7 @@ export type ExportResult =
 
 ## 6. CSP·권한 정리
 - CSP `connect-src`에 원격 주소를 넣지 않는다. AI 호출은 Rust의 reqwest가 한다. 화면은 `ipc:`·`wyasset`(D-17)만 쓴다.
-- capability에 더할 것: 없음. AI·키·내보내기는 모두 앱 자체 명령이다. dialog 플러그인은 Rust에서만 부르므로 `dialog:*` 권한을 넣지 않는다(구현 때 확인).
+- capability에 더할 것: 없음. AI·키·내보내기는 모두 앱 자체 명령이다. dialog 플러그인은 Rust에서만 부르므로 `dialog:*` 권한을 넣지 않는다(구현 때 확인). `open_export_dir`도 opener의 Rust API(`Opener::open_path`, 범위 검사 없음)를 쓰므로 opener 권한을 바꾸지 않는다.
 - 공용 파일 변경(10절 승인 뒤, pm에 알리고): `src-tauri/Cargo.toml`에 crate 추가, `lib.rs`의 플러그인·명령 등록.
 
 ## 7. 구현 때 만들 파일 (예정)

@@ -1,6 +1,7 @@
 // Tauri 명령(docs/계약-DB.md 8절)을 감싼 타입 있는 클라이언트. 화면은 invoke를 직접 부르지 않고 이것만 쓴다.
 // Tauri 밖(브라우저 개발)에서는 메모리 가짜 구현(mock.ts)으로 바뀐다. 실패하면 AppError로 reject한다.
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import type { ExportRequest, ExportResult } from "../export/exportTree";
 import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode, UiState } from "../lib/db-types";
 
 export type Backend = {
@@ -27,6 +28,8 @@ export type Backend = {
   getUiState(): Promise<UiState>;
   /** 통째로 바꾼다(16KB 넘으면 InvalidInput). */
   setUiState(state: UiState): Promise<void>;
+  /** F-06(docs/계약-AI.md 5.3). Rust가 폴더 선택 창을 띄운다. 고르지 않으면 { cancelled: true }. */
+  exportMarkdown(req: ExportRequest): Promise<ExportResult>;
 };
 
 // 화면 상태 임시 보관: get_ui_state·set_ui_state가 이 가지에 병합되기 전까지 WebView localStorage에 둔다.
@@ -67,6 +70,7 @@ const tauriBackend: Backend = {
   getDataDir: () => invoke("get_data_dir"),
   getUiState: uiStateStore.get,
   setUiState: uiStateStore.set,
+  exportMarkdown: (req) => invoke("export_markdown", req),
 };
 
 let backend: Backend | null = null;
