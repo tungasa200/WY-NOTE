@@ -3,6 +3,9 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errorReason } from "../api";
+import { AiPanel } from "../ai/AiPanel";
+import { createEditorTarget } from "../ai/editorTarget";
+import type { EditorInstance } from "../editor/Editor";
 import { SearchPanel, type RecentPage } from "../features/search/SearchPanel";
 import { TrashPanel } from "../features/trash/TrashPanel";
 import { ConfirmDialog } from "../lib/ConfirmDialog";
@@ -13,10 +16,11 @@ import { ancestors, descendantIds, indexTree } from "../tree/tree";
 import { Autosaver, type SaveStatus } from "./autosave";
 import { CloseSaveDialog } from "./CloseSaveDialog";
 import { PageView } from "./PageView";
+import { SettingsView } from "./SettingsView";
 import { Toast, type ToastData } from "./Toast";
 import "./AppShell.css";
 
-type View = "page" | "trash";
+type View = "page" | "trash" | "settings";
 
 const CLOSE_SAVE_TIMEOUT_MS = 3000;
 // 검색 전 저장을 이보다 오래 기다리지 않는다(저장이 멈춰도 검색은 된다).
@@ -54,6 +58,13 @@ export function AppShell() {
   const [openId, setOpenId] = useState<PageId | null>(null);
   const [focusTitle, setFocusTitle] = useState(false);
   const [view, setView] = useState<View>("page");
+  // 열린 페이지의 편집기. AI 패널이 선택·본문을 읽고 결과를 넣는다.
+  const [editor, setEditor] = useState<EditorInstance | null>(null);
+  const onEditor = useCallback((ed: EditorInstance, attached: boolean) => {
+    // 페이지를 바꾸면 새 편집기가 먼저 붙고 옛 편집기가 나중에 떨어질 수 있다: 지금 편집기일 때만 비운다.
+    setEditor((cur) => (attached ? ed : cur === ed ? null : cur));
+  }, []);
+  const aiTarget = useMemo(() => (editor ? createEditorTarget(editor) : null), [editor]);
   const [layout, setLayout] = useState<Layout>({ sidebar: true, ai: false });
   // 저장한 화면 상태를 받기 전에 사용자가 바꿨으면, 늦게 온 저장값으로 덮지 않는다.
   const layoutTouched = useRef(false);
@@ -344,7 +355,25 @@ export function AppShell() {
     [saver],
   );
 
-  // 전역 단축키(S-01). 설정 Ctrl+,은 설정 화면이 붙을 때 더한다.
+  /**
+   * 페이지 화면을 떠나 휴지통·설정으로 간다. 남은 저장을 보내고 들고 있던 본문을 버린다:
+   * 편집기는 본문을 만들 때 한 번만 읽으므로, 돌아올 때 openPage가 새로 읽은 본문으로 다시 그리게 한다.
+   */
+  const leavePage = useCallback(
+    (to: Exclude<View, "page">) => {
+      if (openIdRef.current !== null) void saver.flush(openIdRef.current);
+      setPage(null);
+      setView(to);
+    },
+    [saver],
+  );
+  const openSettings = useCallback(() => leavePage("settings"), [leavePage]);
+  const closeAi = useCallback(() => {
+    layoutTouched.current = true;
+    setLayout((l) => ({ ...l, ai: false }));
+  }, []);
+
+  // 전역 단축키(S-01).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -354,6 +383,7 @@ export function AppShell() {
         KeyN: () => void createPage(null),
         Backslash: () => updateLayout((l) => ({ ...l, sidebar: !l.sidebar })),
         KeyJ: () => updateLayout((l) => ({ ...l, ai: !l.ai })),
+        Comma: openSettings,
       }[e.code];
       if (!action) return;
       e.preventDefault(); // 대화상자가 열려 있어도 WebView 기본 동작(Ctrl+N 새 창 등)은 막는다
@@ -362,7 +392,7 @@ export function AppShell() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [createPage]);
+  }, [createPage, openSettings]);
 
   // 릴리스에서는 새로 고침을 막는다(편집 상태가 날아간다). 확대(Ctrl+±·휠)는 막지 않는다.
   // WebView2 기본 오른쪽 클릭 메뉴에도 '새로 고침'이 있어, 글을 고치는 곳(편집기·입력칸) 밖에서는 띄우지 않는다.
@@ -452,14 +482,20 @@ export function AppShell() {
               type="button"
               className="sidebar-link"
               aria-current={view === "trash" ? "page" : undefined}
-              onClick={() => {
-                if (openId !== null) void saver.flush(openId);
-                setView("trash");
-              }}
+              onClick={() => leavePage("trash")}
             >
               휴지통
             </button>
-            {/* S-08 설정 진입 자리 */}
+            <button
+              type="button"
+              className="sidebar-link"
+              aria-current={view === "settings" ? "page" : undefined}
+              aria-keyshortcuts="Control+,"
+              title="설정 (Ctrl+,)"
+              onClick={openSettings}
+            >
+              설정
+            </button>
           </div>
         </nav>
       )}
@@ -539,6 +575,8 @@ export function AppShell() {
                 다시 불러오기
               </button>
             </div>
+          ) : view === "settings" ? (
+            <SettingsView />
           ) : view === "trash" ? (
             <TrashPanel
               key={trashVersion}
@@ -558,25 +596,20 @@ export function AppShell() {
               focusTitle={focusTitle}
               onTitleChange={(t) => renamePage(page.id, t)}
               onContentChange={(doc: JSONContent) => saver.setContent(page.id, doc)}
+              onEditor={onEditor}
             />
           ) : null}
         </div>
       </main>
 
       {layout.ai && (
-        // S-07 AI 패널 자리
         <aside className="ai-panel" aria-label="AI 패널">
-          <div className="ai-panel-head">
-            <span>AI</span>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="AI 패널 닫기"
-              onClick={() => updateLayout((l) => ({ ...l, ai: false }))}
-            >
-              ✕
-            </button>
-          </div>
+          <AiPanel
+            pageId={view === "page" ? openId : null}
+            target={view === "page" ? aiTarget : null}
+            onClose={closeAi}
+            onOpenSettings={openSettings}
+          />
         </aside>
       )}
 

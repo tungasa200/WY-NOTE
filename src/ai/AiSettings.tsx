@@ -1,7 +1,8 @@
 // 설정의 AI 부분(화면설계 S-08, F-08.4·F-08.6·F-08.7). 앱의 설정 화면이 이 컴포넌트를 넣는다.
 // 키는 붙여넣은 뒤 시험 호출이 통과해야 저장된다(set_api_key). 화면은 끝 4자리만 받는다. 키 원문은 이 화면의 입력칸에만 잠깐 있다.
 import { useEffect, useId, useRef, useState } from "react";
-import { aiApi, aiErrorReason } from "../api/ai";
+import { AI_FAIL, errorReason } from "../api";
+import { aiApi } from "../api/ai";
 import type { AiUsageDay, KeyStatus } from "../lib/ai-types";
 import { notifyAiStatusChanged, useAiStatus, useOnline } from "./useAiStatus";
 import "./AiSettings.css";
@@ -61,7 +62,7 @@ function KeySection() {
       focusNext.current = "change";
       notifyAiStatusChanged();
     } catch (e) {
-      setError(`키를 확인하지 못했습니다: ${aiErrorReason(e)}.`);
+      setError(`키를 확인하지 못했습니다: ${errorReason(e, AI_FAIL)}.`);
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -78,7 +79,7 @@ function KeySection() {
       focusNext.current = "input";
       notifyAiStatusChanged();
     } catch (e) {
-      setError(`키를 삭제하지 못했습니다: ${aiErrorReason(e)}.`);
+      setError(`키를 삭제하지 못했습니다: ${errorReason(e, AI_FAIL)}.`);
     }
   };
 
@@ -263,7 +264,7 @@ function LimitSection() {
         clearTimeout(savedTimer.current);
         savedTimer.current = setTimeout(() => setSaved(false), 1500);
       } catch (e) {
-        setError(`저장하지 못했습니다: ${aiErrorReason(e)}.`);
+        setError(`저장하지 못했습니다: ${errorReason(e, AI_FAIL)}.`);
       }
     }, 400);
   };

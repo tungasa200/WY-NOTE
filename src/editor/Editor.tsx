@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   EditorContent,
   useEditor,
@@ -31,6 +31,8 @@ import "./Editor.css";
 /** 빈 문서 기본값(DB 계약과 같은 값). */
 export const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
+export type EditorInstance = TiptapEditor;
+
 type EditorProps = {
   /** 처음 보여 줄 본문(TipTap JSON). 없으면 EMPTY_DOC. */
   content?: JSONContent;
@@ -46,6 +48,8 @@ type EditorProps = {
    * 만들 때 한 번만 읽는다.
    */
   autofocus?: FocusPosition;
+  /** 편집기가 붙으면 (editor, true), 떨어지면 (editor, false). AI 패널이 선택·본문을 읽는다. */
+  onEditor?: (editor: TiptapEditor, attached: boolean) => void;
 };
 
 type ImageHandlers = {
@@ -105,7 +109,7 @@ const EDITOR_PROPS = {
   attributes: { class: "editor-body", "aria-label": "노트 본문", spellcheck: "false" },
 };
 
-export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end" }: EditorProps) {
+export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor }: EditorProps) {
   const uploadRef = useRef(onImageUpload);
   uploadRef.current = onImageUpload;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +165,12 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
     editorProps: EDITOR_PROPS,
     onUpdate: ({ editor }) => onChange?.(editor.getJSON()),
   });
+  const onEditorRef = useRef(onEditor);
+  onEditorRef.current = onEditor;
+  useEffect(() => {
+    onEditorRef.current?.(editor, true);
+    return () => onEditorRef.current?.(editor, false);
+  }, [editor]);
   const link = useLinkMenu(editor, notify);
 
   return (

@@ -1,7 +1,8 @@
 // AI 패널(화면설계 S-07, F-08.1~F-08.3·F-08.5). 앱 셸의 오른쪽 자리(aside) 안을 채운다.
 // 결과는 사용자가 "바꾸기"·"삽입"을 누르기 전에는 노트에 들어가지 않는다. 요청 중에도 편집은 막지 않는다.
-import { useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { aiApi, aiErrorKind, aiErrorReason } from "../api/ai";
+import { memo, useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { AI_FAIL, errorKind, errorReason } from "../api";
+import { aiApi } from "../api/ai";
 import type { PageId } from "../lib/db-types";
 import { AI_INPUT_LIMIT, type AiResult, type AiStatus } from "../lib/ai-types";
 import { charCount, incompleteReason, localDay, pickHistory, untilMidnight } from "./aiLogic";
@@ -61,7 +62,8 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
+/** 앱 셸은 저장 상태가 바뀔 때마다 다시 그려진다. props가 그대로면 패널은 다시 그리지 않는다. */
+export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
   const online = useOnline();
   const { status, failed, refresh } = useAiStatus(pageId);
   const [tab, setTabState] = useState<Tab>(lastTab);
@@ -95,7 +97,9 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
       return;
     }
     const read = () => {
-      setSel(target.selection());
+      // 같은 선택이면 이전 값을 그대로 둬 패널을 다시 그리지 않는다(글자 입력마다 불린다).
+      const next = target.selection();
+      setSel((prev) => (prev && next && prev.from === next.from && prev.to === next.to && prev.text === next.text ? prev : next));
       setDocLen(charCount(target.docText()));
     };
     read();
@@ -165,7 +169,7 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
 
   const afterRequest = (e?: unknown) => {
     setBusy(null);
-    const k = e === undefined ? null : aiErrorKind(e);
+    const k = e === undefined ? null : errorKind(e);
     // 횟수·키·제외 상태가 바뀌었을 수 있다. 열린 설정 화면(오늘 n회·사용 기록)도 같이 다시 읽게 알린다.
     if (k !== "Offline") notifyAiStatusChanged();
   };
@@ -192,8 +196,8 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
       patch({ text: res.text, truncated: res.truncated, incomplete: incompleteReason(res.stopReason), state: "done" });
       afterRequest();
     } catch (e) {
-      if (aiErrorKind(e) === "Cancelled") patch({ state: "stopped" });
-      else patch({ state: "error", error: aiErrorReason(e) });
+      if (errorKind(e) === "Cancelled") patch({ state: "stopped" });
+      else patch({ state: "error", error: errorReason(e, AI_FAIL) });
       afterRequest(e);
     }
   };
@@ -244,8 +248,8 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
       patch({ answer: res.text, truncated: res.truncated, incomplete: incompleteReason(res.stopReason), state: "done" });
       afterRequest();
     } catch (e) {
-      if (aiErrorKind(e) === "Cancelled") patch({ state: "stopped" });
-      else patch({ state: "error", error: aiErrorReason(e) });
+      if (errorKind(e) === "Cancelled") patch({ state: "stopped" });
+      else patch({ state: "error", error: errorReason(e, AI_FAIL) });
       afterRequest(e);
     }
   };
@@ -265,6 +269,8 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
 
   const selLen = sel ? charCount(sel.text) : 0;
   const selOver = selLen > AI_INPUT_LIMIT;
+  // 바꾸기·삽입 공통: 정상 완료이고 그 뒤 본문이 바뀌지 않았을 때만.
+  const canPutRewrite = !!target && !!rewrite && insertable(rewrite, rewrite.text) && !rewrite.stale;
 
   return (
     <div className="ai">
@@ -327,8 +333,8 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
                     <button
                       type="button"
                       className="button"
-                      disabled={summary.state !== "done" || !!summary.incomplete || !summary.text.trim()}
-                      onClick={() => summary.watch.insertBelow(summary.text)}
+                      disabled={!target || !insertable(summary, summary.text)}
+                      onClick={() => target?.insertAtCursor(summary.text)}
                     >
                       삽입
                     </button>
@@ -362,7 +368,7 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
                     <button
                       type="button"
                       className="button button-primary"
-                      disabled={rewrite.state !== "done" || rewrite.truncated || !!rewrite.incomplete || rewrite.stale || !rewrite.text.trim()}
+                      disabled={!canPutRewrite}
                       onClick={() => {
                         if (rewrite.watch.replace(rewrite.text)) setRewrite((r) => r && { ...r, stale: true, replaced: true });
                       }}
@@ -372,8 +378,8 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
                     <button
                       type="button"
                       className="button"
-                      disabled={rewrite.state !== "done" || !!rewrite.incomplete || rewrite.stale || !rewrite.text.trim()}
-                      onClick={() => rewrite.watch.insertBelow(rewrite.text)}
+                      disabled={!canPutRewrite}
+                      onClick={() => target?.insertAtCursor(rewrite.text)}
                     >
                       삽입
                     </button>
@@ -411,12 +417,12 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
                       </span>
                     )}
                     {m.state === "stopped" && <p className="ai-meta">중지했습니다</p>}
-                    {m.truncated && <p className="ai-meta"><span className="ai-badge">잘림</span> 출력 상한에 걸려 답이 잘렸습니다</p>}
-                    {m.incomplete && <IncompleteNote reason={m.incomplete} hasText={!!m.answer.trim()} />}
+                    {m.truncated && <EndNote badge="잘림" reason={TRUNCATED} hasText={!!m.answer.trim()} />}
+                    {m.incomplete && <EndNote badge="끝나지 않음" reason={m.incomplete} hasText={!!m.answer.trim()} />}
                     {m.state === "error" && <FailAlert reason={m.error!} />}
                     {m.answer && m.state !== "streaming" && (
                       <div className="ai-actions">
-                        <button type="button" className="button" onClick={() => target?.insertAtCursor(m.answer)} disabled={!target || m.state !== "done" || !!m.incomplete}>
+                        <button type="button" className="button" onClick={() => target?.insertAtCursor(m.answer)} disabled={!target || !insertable(m, m.answer)}>
                           삽입
                         </button>
                         <CopyButton text={m.answer} onCopy={copy} />
@@ -476,7 +482,7 @@ export function AiPanel({ pageId, target, onClose, onOpenSettings }: Props) {
       </p>
     </div>
   );
-}
+});
 
 function Notice({
   blocked,
@@ -616,12 +622,8 @@ function ResultCard({
         </span>
       )}
       {result.state === "stopped" && <p className="ai-meta">중지했습니다</p>}
-      {result.truncated && (
-        <p className="ai-meta">
-          <span className="ai-badge">잘림</span> 출력 상한에 걸려 결과가 잘렸습니다{original !== undefined ? ". 바꾸기는 할 수 없습니다" : ""}
-        </p>
-      )}
-      {result.incomplete && <IncompleteNote reason={result.incomplete} hasText={!!result.text.trim()} />}
+      {result.truncated && <EndNote badge="잘림" reason={TRUNCATED} hasText={!!result.text.trim()} />}
+      {result.incomplete && <EndNote badge="끝나지 않음" reason={result.incomplete} hasText={!!result.text.trim()} />}
       {result.replaced ? (
         <p className="ai-meta">바꿨습니다. Ctrl+Z로 되돌릴 수 있습니다.</p>
       ) : (
@@ -635,11 +637,21 @@ function ResultCard({
   );
 }
 
-/** 거부는 글 없이 끝나기도 한다. 그때는 복사할 것도 없으므로 노트가 그대로라는 것만 알린다. */
-function IncompleteNote({ reason, hasText }: { reason: string; hasText: boolean }) {
+const TRUNCATED = "출력 상한에 걸려 결과가 잘렸습니다";
+
+/**
+ * 정상 완료(end_turn·stop_sequence)로 끝난 결과만 노트에 넣는다. 잘림·거부·문맥 초과·중지·실패는 복사만(D-31).
+ * 다듬기의 바꾸기도 이 조건을 따른다.
+ */
+function insertable(r: { state: Run; truncated: boolean; incomplete?: string | null }, text: string) {
+  return r.state === "done" && !r.truncated && !r.incomplete && !!text.trim();
+}
+
+/** 정상 완료가 아닌 끝남(S-07 끝난 이유). 거부는 글 없이 끝나기도 한다. 그때는 복사할 것도 없으므로 노트가 그대로라는 것만 알린다. */
+function EndNote({ badge, reason, hasText }: { badge: string; reason: string; hasText: boolean }) {
   return (
     <p className="ai-meta">
-      <span className="ai-badge">끝나지 않음</span> {reason}.{" "}
+      <span className="ai-badge">{badge}</span> {reason}.{" "}
       {hasText ? "노트에 넣을 수 없어 복사만 할 수 있습니다." : "노트는 바뀌지 않았습니다."}
     </p>
   );

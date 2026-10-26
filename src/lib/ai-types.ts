@@ -28,23 +28,6 @@ export type AiExcludeMode = "none" | "self" | "subtree";
 /** has_api_key 반환(계약-AI 1.4). */
 export type KeyStatus = { present: boolean; last4: string | null };
 
-/** 계약-AI 4.1에서 AppError.kind에 덧붙인 것. */
-export type AiErrorKind =
-  | "NoApiKey"
-  | "Keyring"
-  | "Offline"
-  | "AiTimeout"
-  | "AiAuth"
-  | "AiCredit"
-  | "AiRateLimit"
-  | "AiOverloaded"
-  | "AiApi"
-  | "AiExcluded"
-  | "AiDailyLimit"
-  | "InputTooLong"
-  | "AiBusy"
-  | "Cancelled";
-
 /** 한 번에 보내는 입력 상한(유니코드 문자 수, F-08.5). 바꿀 수 없다. */
 export const AI_INPUT_LIMIT = 20_000;
 
