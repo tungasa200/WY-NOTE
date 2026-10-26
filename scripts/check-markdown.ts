@@ -1,6 +1,7 @@
 // 마크다운 변환(F-06) 확인 스크립트. 테스트 프레임워크 없이 Node 타입 제거 실행으로 돈다.
 // 실행: node scripts/check-markdown.ts
 import assert from "node:assert/strict";
+import { buildExport } from "../src/export/exportTree.ts";
 import { docToMarkdown, normalizeLanguage } from "../src/export/markdown.ts";
 
 type Node = { type: string; attrs?: Record<string, unknown>; content?: Node[]; text?: string; marks?: { type: string; attrs?: Record<string, unknown> }[] };
@@ -198,6 +199,52 @@ try {
 } catch (e) {
   failed++;
   console.log(`FAIL 이미지 폴더 경로 인코딩\n${(e as Error).message}`);
+}
+
+// 내보내기 묶음(계약-AI 5.2·5.3): 깊이 d의 페이지는 ../×d + images/, 첨부 이름 모양만 attachments로, 알림은 더한다.
+{
+  const pages: Record<number, { title: string; children: number[]; doc: Node }> = {
+    1: { title: "위", children: [2], doc: doc(img("1.png"), p(t("밑", "underline"))) },
+    2: { title: "가운데 (2)", children: [3], doc: doc(img("1.png"), img("2.jpg")) },
+    3: { title: "아래", children: [], doc: doc(img("3 a.png"), p(t("밑", "underline"))) },
+  };
+  const src = {
+    childrenOf: (id: number) => pages[id].children.map((c) => ({ id: c })),
+    getPage: async (id: number) => ({ title: pages[id].title, content: pages[id].doc }),
+  };
+  const progress: string[] = [];
+  const all = await buildExport(src, 1, true, (d, n) => progress.push(`${d}/${n}`));
+  const only = await buildExport(src, 1, false);
+  const checks: [string, () => void][] = [
+    ["깊이별 이미지 경로", () => {
+      assert.equal(all.request.root.markdown, "![](images/1.png)\n\n밑\n");
+      assert.equal(all.request.root.children[0].markdown, "![](../images/1.png)\n\n![](../images/2.jpg)\n");
+      assert.equal(all.request.root.children[0].children[0].markdown, "![](../../images/3%20a.png)\n\n밑\n");
+    }],
+    ["트리 모양·제목 그대로", () => {
+      assert.equal(all.request.root.children[0].title, "가운데 (2)");
+      assert.equal(all.request.root.children[0].children[0].pageId, 3);
+      assert.deepEqual(progress, ["1/3", "2/3", "3/3"]);
+    }],
+    ["첨부 이름 모양만 보낸다", () => {
+      assert.deepEqual(all.request.attachments, ["1.png", "2.jpg"]);
+      assert.deepEqual(all.skippedImages, ["3 a.png"]);
+    }],
+    ["알림은 페이지를 더해 한 번", () => assert.deepEqual(all.warnings.map((w) => `${w.kind}:${w.count}`), ["underline:2"])],
+    ["하위 제외", () => {
+      assert.deepEqual(only.request.root.children, []);
+      assert.deepEqual(only.request.attachments, ["1.png"]);
+    }],
+  ];
+  for (const [name, fn] of checks) {
+    try {
+      fn();
+      console.log(`ok   내보내기 묶음: ${name}`);
+    } catch (e) {
+      failed++;
+      console.log(`FAIL 내보내기 묶음: ${name}\n${(e as Error).message}`);
+    }
+  }
 }
 
 for (const [input, want] of [["js", "javascript"], ["JSX", "javascript"], ["py", "python"], ["sh", "bash"], ["html", "xml"], ["rust", "rust"], [" Go ", "go"]] as const) {
