@@ -21,11 +21,11 @@
   gap: var(--space-0-5);
 }
 
-/* 누르는 영역 44px(설계의 버튼 높이는 30px). 테두리 없는 버튼, 상태는 바탕색으로 보인다. */
+/* 설계의 버튼 높이 30px(누르는 영역 기준은 24px, 사용자 결정). 테두리 없는 버튼, 상태는 바탕색으로 보인다. */
 .editor-button,
 .editor-select {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--control-height);
+  min-height: var(--control-height);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-md);
@@ -38,7 +38,10 @@
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 
+/* 코드 언어 선택은 24px(S-06) */
 .editor-select {
+  min-height: var(--control-height-sm);
+  align-self: center;
   border: 1px solid var(--color-border);
   background: var(--color-bg-raised);
 }
@@ -80,12 +83,12 @@
 }
 
 .editor-body {
-  --hit-size: 44px;
-  --checkbox-size: 18px;
+  --hit-size: var(--hit-target-min, 24px);
+  --checkbox-size: 16px;
   /* 왼쪽 --editor-gutter는 블록 손잡이 자리(S-06) */
   max-width: calc(var(--editor-max-width) + var(--editor-gutter) + var(--space-4));
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4) 96px var(--editor-gutter);
+  padding: var(--space-6) var(--space-4) var(--editor-bottom-space, 96px) var(--editor-gutter);
   min-height: 60vh;
   outline: none;
   overflow-wrap: anywhere;
@@ -99,7 +102,7 @@
   font-family: var(--font-mono);
   font-size: 13.5px;
   line-height: 1.6;
-  tab-size: 4;
+  tab-size: var(--code-tab-size, 2);
   overflow-x: auto;
 }
 
@@ -126,7 +129,7 @@
   margin-top: var(--space-0-5);
 }
 
-/* 체크박스는 18px이지만 누르는 영역은 44px로 넓힌다. */
+/* 체크박스는 16px이지만 누르는 영역은 24px로 넓힌다(S-06). */
 .editor-body ul[data-type="taskList"] li > label::before {
   content: "";
   position: absolute;
@@ -136,6 +139,8 @@
 .editor-body ul[data-type="taskList"] li > label input {
   width: var(--checkbox-size);
   height: var(--checkbox-size);
+  margin: 0;
+  accent-color: var(--color-accent);
   cursor: pointer;
 }
 
@@ -183,6 +188,16 @@
 
 .editor-body .selectedCell {
   box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+/* 링크: 열지 않으므로 손 모양 대신 글자 커서(S-06) */
+.editor-body a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: text;
 }
 
 /* 커서가 있는 빈 문단의 자리표시(S-06) */
@@ -264,7 +279,7 @@
 .block-handle button {
   display: inline-grid;
   place-items: center;
-  width: 22px;
+  width: var(--control-height-sm);
   height: var(--control-height-sm);
   padding: 0;
   border: 0;
@@ -297,14 +312,7 @@
 }
 
 .ico {
-  width: 16px;
-  height: 16px;
   flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* / 메뉴(S-06b) */
@@ -341,8 +349,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* 누르는 영역 44px(설계 목업은 40px) */
-  min-height: 44px;
+  min-height: 40px;
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
 }
@@ -397,18 +404,44 @@
   }
 }
 
-/* 이미지 저장 중·실패 알림 */
-.editor-status:empty {
-  display: none;
+/* 링크 오른쪽 클릭 메뉴(링크 복사) */
+.link-menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  min-width: 160px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--shadow-popover);
 }
 
-.editor-status {
-  position: sticky;
-  bottom: 0;
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-raised);
-  color: var(--color-text-secondary);
+.link-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.link-menu-item:hover,
+.link-menu-item:focus-visible {
+  background: var(--color-bg-hover);
+  outline: none;
+}
+
+@media (forced-colors: active) {
+  .link-menu-item:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }

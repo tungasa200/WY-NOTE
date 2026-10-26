@@ -16,11 +16,15 @@ import { redoDepth, undoDepth } from "@tiptap/pm/history";
 import { NodeSelection } from "@tiptap/pm/state";
 import { CODE_LANGUAGES, lowlight } from "./lowlight";
 import { IMAGE_TYPES, WyImage } from "./image";
+import { ImageBatch } from "./imageNotice";
 import { BlockMove } from "./blockMove";
 import { SlashCommand } from "./slashMenu";
 import { BlockHandle } from "./BlockHandle";
 import { EmptyParagraphHint } from "./placeholder";
 import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from "./uploadPlaceholder";
+import { PasteGuard } from "./paste";
+import { useLinkMenu } from "./LinkMenu";
+import { Toast } from "../app/Toast";
 import "highlight.js/styles/github.css";
 import "./Editor.css";
 
@@ -44,10 +48,9 @@ type EditorProps = {
   autofocus?: FocusPosition;
 };
 
-const SAVING = "이미지 저장 중…";
-
 type ImageHandlers = {
-  insert: (editor: TiptapEditor, files: File[], pos?: number) => void;
+  /** remote: 붙여넣기에서 뺀 외부 이미지 수. 같은 알림에 합친다(S-13). */
+  insert: (editor: TiptapEditor, files: File[], pos?: number, remote?: number) => void;
   canInsert: () => boolean;
   pick: () => void;
 };
@@ -72,10 +75,11 @@ const createExtensions = (handlers: ImageHandlers) => [
   }),
   // 열이 많아도 셀이 뭉개지지 않게 최소 너비를 두고, 넘치면 표만 가로로 스크롤한다.
   TableKit.configure({ table: { resizable: false, cellMinWidth: 80 } }),
-  CodeBlockLowlight.configure({ lowlight, enableTabIndentation: true }),
+  // Tab은 2칸(S-06).
+  CodeBlockLowlight.configure({ lowlight, enableTabIndentation: true, tabSize: 2 }),
   WyImage,
+  // 형식은 여기서 거르지 않는다. 허용 밖 파일도 받아서 넣지 않은 이유를 알린다(ImageBatch.check).
   FileHandler.configure({
-    allowedMimeTypes: IMAGE_TYPES,
     // 붙여넣은 파일을 다른 붙여넣기 처리가 한 번 더 넣지 않게 한다.
     consumePasteEvent: true,
     onPaste: (editor, files, html) => {
@@ -92,6 +96,9 @@ const createExtensions = (handlers: ImageHandlers) => [
   EmptyParagraphHint,
   BlockMove,
   SlashCommand.configure({ canInsertImage: handlers.canInsert, pickImage: handlers.pick }),
+  PasteGuard.configure({
+    onPasted: (editor, { remote, files }) => handlers.insert(editor, files, undefined, remote),
+  }),
 ];
 
 const EDITOR_PROPS = {
@@ -103,21 +110,23 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
   uploadRef.current = onImageUpload;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState("");
-  // 저장 중인 묶음 수. 여러 번 넣을 때 먼저 끝난 쪽이 "저장 중" 알림을 지우지 않게 한다.
-  const pendingRef = useRef(0);
+  // 알림(S-13 토스트). 겹치면 마지막 것만 보인다.
+  const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
+  // setToast는 바뀌지 않으므로 한 번만 만드는 handlers 안에서도 그대로 쓸 수 있다.
+  const [notify] = useState(() => (message: string) => message && setToast({ message, id: Date.now() }));
 
   const [handlers] = useState<ImageHandlers>(() => ({
     canInsert: () => !!uploadRef.current,
     pick: () => fileInputRef.current?.click(),
-    insert: async (editor, files, pos) => {
+    insert: async (editor, all, pos, remote = 0) => {
+      const batch = new ImageBatch(remote);
+      const files = batch.check(all);
       const upload = uploadRef.current;
-      if (!upload) {
-        setStatus("이미지를 저장할 곳이 없어 넣지 않았습니다.");
+      if (!files.length || !upload) {
+        // 저장 콜백이 없으면 붙여넣기·끌어 놓기로도 넣지 않는다(이미지 넣기 메뉴도 꺼져 있다).
+        notify(files.length ? "이미지를 저장할 곳이 없어 넣지 않았습니다." : batch.message());
         return;
       }
-      pendingRef.current += 1;
-      setStatus(SAVING);
       // 저장하는 동안 놓을 자리에 회색 상자를 둔다. 상자는 그동안의 편집을 따라 옮겨진다.
       // 넣은 이미지는 선택된 채로 남는다. 이어 붙여넣은 이미지가 그것을 덮어쓰지 않게 블록이 선택돼 있으면 그 뒤에 둔다.
       const { selection } = editor.state;
@@ -125,11 +134,12 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       const placeholder = addUploadPlaceholder(editor.view, spot, files);
       // 한 장이 실패해도 저장된 것은 넣는다(넣지 않으면 저장된 파일만 남는다).
       const results = await Promise.allSettled(files.map(async (f) => upload(f)));
-      pendingRef.current -= 1;
       if (editor.isDestroyed) return;
       const at = removeUploadPlaceholder(editor.view, placeholder);
 
-      const names = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      const names: string[] = [];
+      results.forEach((r, i) => (r.status === "fulfilled" ? names.push(r.value) : batch.fail(files[i], r.reason)));
+      batch.inserted = names.length;
       if (names.length) {
         // 여러 장도 실행 취소 한 번에 되돌린다.
         const nodes = names.map((name) => ({ type: "image", attrs: { src: name } }));
@@ -139,16 +149,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
         else chain.insertContentAt(Math.min(at, editor.state.doc.content.size), nodes);
         chain.run();
       }
-
-      const failed = results.find((r) => r.status === "rejected");
-      if (failed) {
-        const reason = failed.reason instanceof Error ? failed.reason.message : String(failed.reason);
-        const what = files.length > 1 ? `이미지 ${files.length}장 중 ${files.length - names.length}장을` : "이미지를";
-        setStatus(`${what} 저장하지 못했습니다(${reason}). 그 이미지를 다시 넣어 보세요.`);
-      } else if (pendingRef.current === 0) {
-        // 다른 묶음의 실패 알림은 지우지 않는다.
-        setStatus((s) => (s === SAVING ? "" : s));
-      }
+      notify(batch.message());
     },
   }));
   const [extensions] = useState(() => createExtensions(handlers));
@@ -160,6 +161,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
     editorProps: EDITOR_PROPS,
     onUpdate: ({ editor }) => onChange?.(editor.getJSON()),
   });
+  const link = useLinkMenu(editor, notify);
 
   return (
     <div className="editor">
@@ -176,13 +178,19 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
           if (files.length) handlers.insert(editor, files);
         }}
       />
-      <div className="editor-content" ref={wrapRef}>
+      <div
+        className="editor-content"
+        ref={wrapRef}
+        onContextMenu={link.onContextMenu}
+        onClickCapture={link.onClickCapture}
+        onAuxClick={link.onAuxClick}
+        onMouseOver={link.onMouseOver}
+      >
         <BlockHandle editor={editor} wrapRef={wrapRef} />
         <EditorContent editor={editor} />
       </div>
-      <p className="editor-status" role="status">
-        {status}
-      </p>
+      {link.menu}
+      {toast && <Toast key={toast.id} data={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
