@@ -1,4 +1,4 @@
-//! Tauri 명령 17개(계약 8절)와 wyasset 프로토콜 응답. 화면↔백엔드 경계.
+//! Tauri 명령 19개(계약 8절)와 wyasset 프로토콜 응답. 화면↔백엔드 경계.
 use crate::db::{
     attachments,
     pages::{self, Page, ToRoot, TrashItem, TrashedCount, TreeNode, UpdatedAt},
@@ -31,6 +31,14 @@ impl AppState {
             // 다른 명령이 패닉해도 트랜잭션은 drop 때 롤백되므로 연결은 계속 쓸 수 있다.
             Ok(m) => Ok(m.lock().unwrap_or_else(|e| e.into_inner())),
             Err(e) => Err(e.clone()),
+        }
+    }
+
+    /// 종료 때 WAL을 본 파일에 합친다(계약 v2 11절 ⑤). 실패해도 데이터는 안전하다(다음 실행 때 합쳐짐).
+    pub fn checkpoint(&self) {
+        if let Ok(conn) = self.conn() {
+            // 결과 행(busy, log, checkpointed)을 돌려주는 PRAGMA라 query_row로 부른다.
+            let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
         }
     }
 
@@ -149,6 +157,17 @@ pub async fn save_attachment(state: S<'_>, request: Request<'_>) -> AppResult<Fi
 }
 
 #[tauri::command]
+pub async fn get_ui_state(state: S<'_>) -> AppResult<Value> {
+    pages::get_ui_state(&*state.conn()?)
+}
+
+#[tauri::command]
+pub async fn set_ui_state(app_state: S<'_>, state: Value) -> AppResult<()> {
+    // JS 인자 이름이 state(계약)라 State 매개변수 이름을 바꿨다.
+    pages::set_ui_state(&*app_state.conn()?, &state)
+}
+
+#[tauri::command]
 pub async fn get_data_dir(state: S<'_>) -> AppResult<String> {
     Ok(state.data_dir.to_string_lossy().into_owned())
 }
@@ -165,10 +184,29 @@ pub fn asset_response(app: &AppHandle, uri_path: &str) -> Response<Cow<'static, 
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, mime)
             .header("X-Content-Type-Options", "nosniff")
-            // SVG를 문서로 직접 열어도 스크립트가 돌지 않게 한다.
+            // 주소로 직접 열어도 스크립트가 돌지 않게 한다(SVG는 받지 않지만 방어용으로 둔다).
             .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
             .body(Cow::Owned(bytes)),
         None => Response::builder().status(StatusCode::NOT_FOUND).body(Cow::Borrowed(&[][..])),
     };
     res.unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checkpoint_truncates_wal() {
+        let dir = crate::db::temp_dir("ckpt");
+        let conn = crate::db::open(&dir.join("wy-note.db")).unwrap();
+        conn.execute("INSERT INTO app_state (key, value) VALUES ('k', '1')", []).unwrap();
+        let wal = dir.join("wy-note.db-wal");
+        assert!(std::fs::metadata(&wal).unwrap().len() > 0);
+        let state = AppState::new(Ok(conn), dir.clone());
+        state.checkpoint();
+        assert_eq!(std::fs::metadata(&wal).unwrap().len(), 0);
+        drop(state);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
