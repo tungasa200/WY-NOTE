@@ -40,7 +40,7 @@ export function SearchPanel({ search, onOpenPage, onClose, pathOf, recent = [] }
   // 결과를 골라 닫을 때는 연 곳으로 포커스를 돌리지 않는다(부모가 편집기로 옮긴다).
   const opened = useRef(false);
 
-  useModalDialog(dialogRef, { shouldRestore: () => !opened.current });
+  useModalDialog(dialogRef, { shouldRestore: () => !opened.current, onBackdrop: onClose });
 
   // 입력이 멈춘 뒤 검색한다. 늦게 온 옛 응답은 버린다.
   useEffect(() => {
@@ -129,9 +129,6 @@ export function SearchPanel({ search, onOpenPage, onClose, pathOf, recent = [] }
       onCancel={(e) => {
         e.preventDefault(); // 닫기는 부모가 내리는 것으로 한다(포커스 복귀를 한곳에서).
         onClose();
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose(); // 뒤 막(::backdrop) 클릭
       }}
     >
       <div className="search-input-row">

@@ -24,7 +24,6 @@ import { EmptyParagraphHint } from "./placeholder";
 import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from "./uploadPlaceholder";
 import { PasteGuard } from "./paste";
 import { useLinkMenu } from "./LinkMenu";
-import { Toast } from "../app/Toast";
 import "highlight.js/styles/github.css";
 import "./Editor.css";
 
@@ -50,11 +49,16 @@ type EditorProps = {
   autofocus?: FocusPosition;
   /** 편집기가 붙으면 (editor, true), 떨어지면 (editor, false). AI 패널이 선택·본문을 읽는다. */
   onEditor?: (editor: TiptapEditor, attached: boolean) => void;
+  /** 알림 문구(S-13). 앱 토스트로 띄운다. */
+  onNotify?: (message: string) => void;
 };
 
 type ImageHandlers = {
-  /** remote: 붙여넣기에서 뺀 외부 이미지 수. 같은 알림에 합친다(S-13). */
-  insert: (editor: TiptapEditor, files: File[], pos?: number, remote?: number) => void;
+  /**
+   * pos: 넣을 자리. 배열이면 files[i]의 자리(없는 칸은 커서 자리). 없으면 커서 자리.
+   * remote: 붙여넣기에서 뺀 외부 이미지 수. 같은 알림에 합친다(S-13).
+   */
+  insert: (editor: TiptapEditor, files: File[], pos?: number | (number | undefined)[], remote?: number) => void;
   canInsert: () => boolean;
   pick: () => void;
 };
@@ -101,7 +105,7 @@ const createExtensions = (handlers: ImageHandlers) => [
   BlockMove,
   SlashCommand.configure({ canInsertImage: handlers.canInsert, pickImage: handlers.pick }),
   PasteGuard.configure({
-    onPasted: (editor, { remote, files }) => handlers.insert(editor, files, undefined, remote),
+    onPasted: (editor, { remote, files, spots }) => handlers.insert(editor, files, spots, remote),
   }),
 ];
 
@@ -109,15 +113,15 @@ const EDITOR_PROPS = {
   attributes: { class: "editor-body", "aria-label": "노트 본문", spellcheck: "false" },
 };
 
-export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor }: EditorProps) {
+export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor, onNotify }: EditorProps) {
   const uploadRef = useRef(onImageUpload);
   uploadRef.current = onImageUpload;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  // 알림(S-13 토스트). 겹치면 마지막 것만 보인다.
-  const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
-  // setToast는 바뀌지 않으므로 한 번만 만드는 handlers 안에서도 그대로 쓸 수 있다.
-  const [notify] = useState(() => (message: string) => message && setToast({ message, id: Date.now() }));
+  const notifyRef = useRef(onNotify);
+  notifyRef.current = onNotify;
+  // 한 번만 만드는 handlers 안에서도 지금 콜백을 부르게 ref로 읽는다. 빈 문구는 띄우지 않는다.
+  const [notify] = useState(() => (message: string) => void (message && notifyRef.current?.(message)));
 
   const [handlers] = useState<ImageHandlers>(() => ({
     canInsert: () => !!uploadRef.current,
@@ -134,23 +138,40 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       // 저장하는 동안 놓을 자리에 회색 상자를 둔다. 상자는 그동안의 편집을 따라 옮겨진다.
       // 넣은 이미지는 선택된 채로 남는다. 이어 붙여넣은 이미지가 그것을 덮어쓰지 않게 블록이 선택돼 있으면 그 뒤에 둔다.
       const { selection } = editor.state;
-      const spot = pos ?? (selection instanceof NodeSelection ? selection.to : selection.from);
-      const placeholder = addUploadPlaceholder(editor.view, spot, files);
+      const cursor = selection instanceof NodeSelection ? selection.to : selection.from;
+      // 붙여넣은 HTML의 이미지는 저마다 자리가 있다. 같은 자리로 갈 파일끼리 상자 하나에 묶는다.
+      const index = new Map(all.map((f, i) => [f, i]));
+      const groups = new Map<number, File[]>();
+      for (const f of files) {
+        const spot = (Array.isArray(pos) ? pos[index.get(f)!] : pos) ?? cursor;
+        const group = groups.get(spot);
+        if (group) group.push(f);
+        else groups.set(spot, [f]);
+      }
+      const placed = [...groups].map(([spot, group]) => ({ group, id: addUploadPlaceholder(editor.view, spot, group) }));
       // 한 장이 실패해도 저장된 것은 넣는다(넣지 않으면 저장된 파일만 남는다).
       const results = await Promise.allSettled(files.map(async (f) => upload(f)));
       if (editor.isDestroyed) return;
-      const at = removeUploadPlaceholder(editor.view, placeholder);
 
-      const names: string[] = [];
-      results.forEach((r, i) => (r.status === "fulfilled" ? names.push(r.value) : batch.fail(files[i], r.reason)));
-      batch.inserted = names.length;
-      if (names.length) {
-        // 여러 장도 실행 취소 한 번에 되돌린다.
-        const nodes = names.map((name) => ({ type: "image", attrs: { src: name } }));
-        // 자리가 지워졌으면 지금 커서 자리에 넣는다.
+      const names = new Map<File, string>();
+      results.forEach((r, i) => (r.status === "fulfilled" ? names.set(files[i], r.value) : batch.fail(files[i], r.reason)));
+      batch.inserted = names.size;
+      // 상자를 걷는다. 자리가 지워졌으면 지금 커서 자리에 넣는다.
+      const spots = placed.map(({ group, id }) => ({ at: removeUploadPlaceholder(editor.view, id), group }));
+      const now = editor.state.selection.from;
+      const inserts = spots
+        .map(({ at, group }) => ({
+          at: Math.min(at ?? now, editor.state.doc.content.size),
+          nodes: group.flatMap((f) => (names.has(f) ? [{ type: "image", attrs: { src: names.get(f) } }] : [])),
+        }))
+        .filter((x) => x.nodes.length)
+        // 앞 자리부터 넣어 선택이 마지막(맨 뒤) 이미지에 남게 한다. 같은 자리면 붙여넣은 순서대로 이어진다.
+        .sort((a, b) => a.at - b.at);
+      if (inserts.length) {
+        // 여러 장도 실행 취소 한 번에 되돌린다. 앞에 넣은 것만큼 뒤 자리를 옮긴다(같은 자리면 앞에 넣은 것 뒤로).
         const chain = editor.chain().focus();
-        if (at === undefined) chain.insertContent(nodes);
-        else chain.insertContentAt(Math.min(at, editor.state.doc.content.size), nodes);
+        for (const { at, nodes } of inserts)
+          chain.command(({ tr, commands }) => commands.insertContentAt(tr.mapping.map(at), nodes));
         chain.run();
       }
       notify(batch.message());
@@ -200,7 +221,6 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
         <EditorContent editor={editor} />
       </div>
       {link.menu}
-      {toast && <Toast key={toast.id} data={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

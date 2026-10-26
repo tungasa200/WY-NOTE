@@ -1,6 +1,6 @@
 import { Extension, type Editor } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { dataUrlToFile, isAssetUrl } from "./image";
+import { assetUrl, dataUrlToFile, isAssetUrl } from "./image";
 
 /** 붙여넣은 HTML에서 걷어 낸 이미지. */
 export type PastedImages = {
@@ -8,6 +8,8 @@ export type PastedImages = {
   remote: number;
   /** data: 이미지를 파일로 바꾼 것. 첨부로 저장해 넣는다. */
   files: File[];
+  /** files[i]를 넣을 자리(붙여넣은 HTML에서 그 이미지가 있던 곳). 자리를 잃었으면 undefined. */
+  spots: (number | undefined)[];
 };
 
 type PasteGuardOptions = {
@@ -18,7 +20,8 @@ type PasteGuardOptions = {
 /**
  * 붙여넣기 거르기(사용자 결정, NF-06).
  * - 붙여넣은 HTML의 외부 이미지는 넣지 않고 그 수를 알린다. 그리면 네트워크 요청이 나가기 때문이다.
- * - data: 이미지는 파일로 바꿔 첨부로 저장한다. 붙여넣은 내용 뒤(붙여넣은 뒤의 커서 자리)에 들어간다.
+ * - data: 이미지는 파일로 바꿔 첨부로 저장한다. 그 이미지가 있던 자리에 들어간다:
+ *   img를 첨부 주소 모양의 표지로 바꿔 두면 이미지 노드로 읽힌다. 붙여넣은 트랜잭션 뒤에 그 노드를 지우며 자리를 얻는다.
  * - Ctrl+Shift+V는 서식 없이 글만 붙여 넣는다. 글 서식은 ProseMirror가 Shift를 보고 이미 빼므로,
  *   여기서는 함께 실린 이미지 파일을 넣지 않게만 한다.
  */
@@ -33,7 +36,8 @@ export const PasteGuard = Extension.create<PasteGuardOptions>({
     const { editor, options } = this;
     // transformPastedHTML은 FileHandler가 붙여넣기를 가로채기 전에도 불리므로, 걷어 낸 것을 바로 처리하지 않고
     // 붙여넣기가 실제로 문서에 들어간 트랜잭션에서 처리한다.
-    let pending: PastedImages | null = null;
+    let pending: (Omit<PastedImages, "spots"> & { marker: string }) | null = null;
+    let pasteCount = 0;
     let plainPaste = false;
     const reset = () => {
       pending = null;
@@ -51,17 +55,18 @@ export const PasteGuard = Extension.create<PasteGuardOptions>({
           transformPastedHTML(html) {
             if (!/<img/i.test(html)) return html;
             const doc = new DOMParser().parseFromString(html, "text/html");
-            const images: PastedImages = { remote: 0, files: [] };
+            // 붙여넣기마다 다른 표지. 문서에 들어간 트랜잭션에서 바로 지운다.
+            const images = { remote: 0, files: [] as File[], marker: `wy-paste-${Date.now()}-${++pasteCount}-` };
             for (const img of Array.from(doc.querySelectorAll("img"))) {
               const src = img.getAttribute("src") ?? "";
               if (isAssetUrl(src)) continue;
-              if (/^data:/i.test(src)) {
-                const file = dataUrlToFile(src);
-                if (file) images.files.push(file);
-                else images.remote += 1;
-              } else {
-                images.remote += 1;
+              const file = /^data:/i.test(src) ? dataUrlToFile(src) : null;
+              if (file) {
+                img.setAttribute("src", assetUrl(images.marker + images.files.length));
+                images.files.push(file);
+                continue;
               }
+              images.remote += 1;
               img.remove();
             }
             pending = images.remote || images.files.length ? images : null;
@@ -77,17 +82,34 @@ export const PasteGuard = Extension.create<PasteGuardOptions>({
             return true;
           },
         },
-        appendTransaction(trs) {
-          if (!pending) return null;
-          const ui = trs.map((tr) => tr.getMeta("uiEvent"));
-          if (!ui.includes("paste") && !ui.includes("drop")) return null;
-          const images = pending;
+        appendTransaction(trs, _old, state) {
+          if (!pending || !trs.some((tr) => tr.docChanged)) return null;
+          const { marker, ...rest } = pending;
+          const found: { index: number; pos: number }[] = [];
+          // 이미지는 블록이라 글 블록 안은 보지 않는다.
+          state.doc.descendants((node, pos) => {
+            const src: unknown = node.type.name === "image" ? node.attrs.src : null;
+            if (typeof src === "string" && src.startsWith(marker)) found.push({ index: Number(src.slice(marker.length)), pos });
+            return !node.isTextblock;
+          });
+          // 붙여넣기는 그 뒤 첫 문서 변경에 들어오거나 들어오지 않는다(가로채였을 때). 어느 쪽이든 여기서 끝낸다.
+          // 표 붙여넣기(prosemirror-tables)처럼 uiEvent 없이 들어오는 것도 표지가 보이면 처리한다.
           pending = null;
+          const ui = trs.map((tr) => tr.getMeta("uiEvent"));
+          if (!found.length && !ui.includes("paste") && !ui.includes("drop")) return null;
+          // 표지 노드를 지우고 그 자리를 기억한다. 뒤에서부터 지워 앞 노드의 위치가 그대로이게 한다.
+          found.reverse();
+          const tr = state.tr;
+          for (const { pos } of found) tr.delete(pos, pos + state.doc.nodeAt(pos)!.nodeSize);
+          // 지운 노드의 시작은 제 삭제로는 그대로이고, 더 앞의 삭제만큼 당겨진다(삭제가 단계를 몇 개 만들든 맞다).
+          const spots = rest.files.map((): number | undefined => undefined);
+          for (const { index, pos } of found) spots[index] = tr.mapping.map(pos, -1);
+          const images: PastedImages = { ...rest, spots };
           // 트랜잭션 처리 중에 다른 트랜잭션을 보내지 않게 한 박자 뒤에 넣는다.
           queueMicrotask(() => {
             if (!editor.isDestroyed) options.onPasted(editor, images);
           });
-          return null;
+          return tr.docChanged ? tr : null;
         },
       }),
     ];

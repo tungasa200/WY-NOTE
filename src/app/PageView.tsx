@@ -5,8 +5,11 @@ import { Editor, type EditorInstance } from "../editor/Editor";
 import { imageExt } from "../editor/image";
 import type { JSONContent, Page } from "../lib/db-types";
 
+/** 편집 영역에 연 페이지. 이름은 트리가 원본이라 본문만 든다. */
+export type OpenPage = Pick<Page, "id" | "content">;
+
 type Props = {
-  page: Page;
+  page: OpenPage;
   /** 트리와 같은 값(이름은 트리 목록이 원본). */
   title: string;
   /** 새로 만든 페이지면 제목에 커서를 둔다(F-01.1). */
@@ -14,9 +17,10 @@ type Props = {
   onTitleChange: (title: string) => void;
   onContentChange: (doc: JSONContent) => void;
   onEditor?: (editor: EditorInstance, attached: boolean) => void;
+  onNotify?: (message: string) => void;
 };
 
-export function PageView({ page, title, focusTitle, onTitleChange, onContentChange, onEditor }: Props) {
+export function PageView({ page, title, focusTitle, onTitleChange, onContentChange, onEditor, onNotify }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
   // 이미지를 이 페이지의 첨부로 저장하고 파일 이름을 받는다(F-02.6). 형식·크기는 편집기가 먼저 거른다(P3-5).
   const uploadImage = async (file: File) =>
@@ -48,6 +52,7 @@ export function PageView({ page, title, focusTitle, onTitleChange, onContentChan
           onChange={onContentChange}
           autofocus={focusTitle ? false : "end"}
           onEditor={onEditor}
+          onNotify={onNotify}
           onImageUpload={uploadImage}
         />
       </div>

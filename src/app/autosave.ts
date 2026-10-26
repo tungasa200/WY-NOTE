@@ -17,6 +17,7 @@ class PageSaver {
   private inflight: Promise<void> | null = null;
   /** 보내는 중인 본문. 끝나기 전에는 DB에 있다고 볼 수 없다. */
   private sending: JSONContent | null = null;
+  private sendingTitle: string | null = null;
   status: SaveStatus = { state: "saved" };
 
   constructor(
@@ -27,6 +28,11 @@ class PageSaver {
   /** DB에 아직 들어갔다고 볼 수 없는 가장 새 본문(보내는 중인 것 포함). */
   get pendingContent() {
     return this.content ?? this.sending;
+  }
+
+  /** DB에 아직 들어갔다고 볼 수 없는 가장 새 제목(보내는 중인 것 포함). */
+  get pendingTitle() {
+    return this.title ?? this.sendingTitle;
   }
 
   get dirty() {
@@ -66,6 +72,7 @@ class PageSaver {
     this.title = null;
     this.firstPendingAt = null;
     this.sending = content;
+    this.sendingTitle = title;
     this.setStatus({ state: "saving" });
     // 제목·본문 호출을 await 없이 한꺼번에 보낸다(창 닫기·새로고침 직전 호출이 끊기지 않게).
     const calls = [
@@ -85,6 +92,7 @@ class PageSaver {
         if (!(isAppError(error) && error.kind === "NotFound")) this.schedule(RETRY_MS);
       } finally {
         this.sending = null;
+        this.sendingTitle = null;
         this.inflight = null;
       }
     })();
@@ -137,6 +145,11 @@ export class Autosaver {
   /** 아직 저장하지 못한 본문(보내는 중인 것 포함). 실패 중 다른 화면에 갔다 돌아오면 DB 본문보다 새것이다. */
   pendingContent(id: PageId): JSONContent | null {
     return this.savers.get(id)?.pendingContent ?? null;
+  }
+
+  /** 아직 저장하지 못한 제목(보내는 중인 것 포함). 트리를 DB에서 다시 읽을 때 DB의 옛 이름 대신 쓴다. */
+  pendingTitle(id: PageId): string | null {
+    return this.savers.get(id)?.pendingTitle ?? null;
   }
 
   status(id: PageId): SaveStatus {
