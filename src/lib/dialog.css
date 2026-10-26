@@ -1,0 +1,45 @@
+/* 모달 창(S-03 모양). ConfirmDialog와 창 닫기 확인이 함께 쓴다. 버튼은 App.css의 공용 .button. */
+.dialog {
+  width: min(420px, calc(100vw - 2 * var(--space-4)));
+  box-sizing: border-box;
+  padding: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-dialog);
+}
+
+.dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.dialog-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-body);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.dialog-body {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dialog-body p {
+  margin: 0 0 var(--space-2);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap; /* 좁은 창·글자 확대에서 버튼이 창 밖으로 나가지 않게 */
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+/* 처리 중: 포커스는 남기고(aria-disabled) 누를 수 없게 보인다. */
+.dialog .button[aria-disabled="true"] {
+  opacity: 0.7;
+  cursor: progress;
+}

@@ -58,8 +58,6 @@ export function visibleRows(ix: TreeIndex): VisibleRow[] {
   return out;
 }
 
-export const displayTitle = (title: string) => title.trim() || "제목 없음";
-
 export type DropZone = "before" | "after" | "inside";
 
 /** 놓을 위치를 move_page 인자로 바꾼다. newPosition은 옮긴 뒤 새 형제 목록에서의 순서. */

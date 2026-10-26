@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api, errorReason, isAppError } from "../api";
 import type { PageId } from "../lib/db-types";
-import { displayTitle } from "../tree/tree";
+import { displayTitle } from "../lib/title";
 import { buildExport, type ExportSource } from "./exportTree";
 import "./ExportDialog.css";
 

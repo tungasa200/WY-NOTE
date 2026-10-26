@@ -2,7 +2,7 @@
 // Tauri 밖(브라우저 개발)에서는 메모리 가짜 구현(mock.ts)으로 바뀐다. 실패하면 AppError로 reject한다.
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { ExportRequest, ExportResult } from "../export/exportTree";
-import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode } from "../lib/db-types";
+import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode, UiState } from "../lib/db-types";
 
 export type Backend = {
   listTree(): Promise<TreeNode[]>;
@@ -21,9 +21,13 @@ export type Backend = {
   search(query: string, limit?: number): Promise<SearchHit[]>;
   getStartPageId(): Promise<PageId | null>;
   setLastPage(id: PageId): Promise<void>;
-  /** ext: png, jpg, jpeg, gif, webp, svg */
+  /** ext: png, jpg, jpeg, gif, webp. 그 밖은 UnsupportedType, 20MB 초과는 FileTooLarge. */
   saveAttachment(pageId: PageId, ext: string, bytes: Uint8Array): Promise<{ fileName: string }>;
   getDataDir(): Promise<string>;
+  /** 저장한 적이 없으면 {}. */
+  getUiState(): Promise<UiState>;
+  /** 통째로 바꾼다(16KB 넘으면 InvalidInput). */
+  setUiState(state: UiState): Promise<void>;
   /** F-06(docs/계약-AI.md 5.3). Rust가 폴더 선택 창을 띄운다. 고르지 않으면 { cancelled: true }. */
   exportMarkdown(req: ExportRequest): Promise<ExportResult>;
 };
@@ -48,6 +52,8 @@ const tauriBackend: Backend = {
   saveAttachment: (pageId, ext, bytes) =>
     invoke("save_attachment", bytes, { headers: { "x-page-id": String(pageId), "x-ext": ext } }),
   getDataDir: () => invoke("get_data_dir"),
+  getUiState: () => invoke("get_ui_state"),
+  setUiState: (state) => invoke("set_ui_state", { state }),
   exportMarkdown: (req) => invoke("export_markdown", req),
 };
 
@@ -89,5 +95,11 @@ export function errorReason(e: unknown): string {
       return "파일을 읽거나 쓰지 못했습니다";
     case "Migration":
       return "데이터 파일을 열지 못했습니다";
+    case "FileTooLarge":
+      return "20MB가 넘는 파일은 넣을 수 없습니다";
+    case "UnsupportedType":
+      return "PNG·JPG·GIF·WebP 이미지만 넣을 수 있습니다";
+    default:
+      return "알 수 없는 오류가 났습니다";
   }
 }

@@ -61,6 +61,11 @@
   font-size: var(--text-body);
 }
 
+/* 전역 :focus-visible 테두리를 덮는다(검색창은 늘 이 칸에 커서가 있어 테두리가 필요 없다). */
+.search-input:focus-visible {
+  outline: none;
+}
+
 .search-dialog kbd {
   display: inline-block;
   min-width: 18px;

@@ -58,6 +58,18 @@
   cursor: pointer;
 }
 
+.sidebar-search {
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.sidebar-search-keys {
+  display: inline-flex;
+  gap: var(--space-0-5);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
 .sidebar-new:hover,
 .sidebar-link:hover {
   background: var(--color-bg-hover);
@@ -144,6 +156,7 @@
 
 .breadcrumb-link {
   min-width: 4em; /* 위 단계 이름이 한 글자로 줄지 않게 */
+  min-height: 24px; /* 누르는 영역 24px(결정 ui-design) */
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -241,10 +254,6 @@
   color: var(--color-text);
 }
 
-.content-slot {
-  min-height: 100%;
-}
-
 /* ── 페이지(S-06 제목 + 본문) ── */
 .page {
   max-width: calc(var(--editor-max-width) + 2 * var(--editor-gutter));
@@ -328,44 +337,6 @@
   font-weight: var(--weight-semibold);
 }
 
-/* ── 확인 창(S-03) ── */
-.dialog {
-  width: min(420px, calc(100vw - 2 * var(--space-4)));
-  box-sizing: border-box;
-  padding: var(--space-6);
-  border: 0;
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-raised);
-  color: var(--color-text);
-  box-shadow: var(--shadow-dialog);
-}
-
-.dialog::backdrop {
-  background: var(--color-overlay);
-}
-
-.dialog-title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-body);
-  line-height: var(--leading-tight);
-  overflow-wrap: anywhere;
-}
-
-.dialog-body {
-  color: var(--color-text-secondary);
-}
-
-.dialog-body p {
-  margin: 0 0 var(--space-2);
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-}
-
 /* ── 알림 ── */
 .toast {
   position: fixed;
@@ -375,13 +346,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  max-width: calc(100vw - 2 * var(--space-4));
+  max-width: min(560px, calc(100vw - 2 * var(--space-4)));
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-text);
   color: var(--color-bg);
   box-shadow: var(--shadow-popover);
   transform: translateX(-50%);
+}
+
+/* 띄어쓰기 없는 긴 제목도 560px 안에서 줄을 바꾼다. */
+.toast > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .toast-action {
