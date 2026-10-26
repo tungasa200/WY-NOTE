@@ -23,15 +23,8 @@ export function CloseSaveDialog({ reason, titles, busy, onRetry, onCloseAnyway, 
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descId = useId();
-  useModalDialog(ref);
+  useModalDialog(ref, { onBackdrop: () => !busy && onDismiss() });
   const rest = titles.length - NAMES_MAX;
-  // 상자 안에서 누르고 밖에서 뗀 끌기(글 고르기)는 바깥 클릭이 아니다. 누른 곳도 바깥이어야 닫는다.
-  const downOutside = useRef(false);
-  const outside = (e: { target: EventTarget; currentTarget: HTMLDialogElement; clientX: number; clientY: number }) => {
-    if (e.target !== e.currentTarget) return false;
-    const r = e.currentTarget.getBoundingClientRect();
-    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-  };
 
   return (
     <dialog
@@ -44,14 +37,6 @@ export function CloseSaveDialog({ reason, titles, busy, onRetry, onCloseAnyway, 
         e.preventDefault();
         if (!busy) onDismiss();
       }}
-      // 바깥(배경)을 누르면 이벤트 대상이 dialog 자신이고 좌표가 상자 밖이다. 상자 안 여백 클릭과 가른다.
-      onMouseDown={(e) => {
-        downOutside.current = outside(e);
-      }}
-      onClick={(e) => {
-        if (!busy && downOutside.current && outside(e)) onDismiss();
-        downOutside.current = false;
-      }}
     >
       <h2 id={titleId} className="dialog-title">
         저장하지 못한 내용이 있습니다
@@ -60,7 +45,7 @@ export function CloseSaveDialog({ reason, titles, busy, onRetry, onCloseAnyway, 
         <p>
           {reason}. 그래도 닫으면 마지막 저장 뒤에 입력한 내용은 사라집니다.
         </p>
-        {titles.length > 1 && (
+        {titles.length >= 1 && (
           <p>
             {titles.slice(0, NAMES_MAX).join(", ")}
             {rest > 0 && ` 외 ${rest}개`}

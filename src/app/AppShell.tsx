@@ -15,7 +15,7 @@ import { PageTree, type PageTreeHandle } from "../tree/PageTree";
 import { ancestors, descendantIds, indexTree } from "../tree/tree";
 import { Autosaver, type SaveStatus } from "./autosave";
 import { CloseSaveDialog } from "./CloseSaveDialog";
-import { PageView } from "./PageView";
+import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
 import { Toast, type ToastData } from "./Toast";
 import "./AppShell.css";
@@ -54,7 +54,7 @@ type ClosePrompt = { reason: string; titles: string[]; busy: boolean };
 
 export function AppShell() {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null);
-  const [page, setPage] = useState<Page | null>(null);
+  const [page, setPage] = useState<OpenPage | null>(null);
   const [openId, setOpenId] = useState<PageId | null>(null);
   const [focusTitle, setFocusTitle] = useState(false);
   const [view, setView] = useState<View>("page");
@@ -85,7 +85,8 @@ export function AppShell() {
   const [confirmTrash, setConfirmTrash] = useState<{ id: PageId; count: number } | null>(null);
   const [toast, setToastState] = useState<(ToastData & { id: number }) | null>(null);
   // 같은 문구가 다시 와도 5초를 새로 센다.
-  const setToast = (t: ToastData) => setToastState({ ...t, id: Date.now() });
+  const setToast = useCallback((t: ToastData) => setToastState({ ...t, id: Date.now() }), []);
+  const notify = useCallback((message: string) => setToast({ message }), [setToast]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const ix = useMemo(() => indexTree(nodes ?? []), [nodes]);
@@ -106,7 +107,11 @@ export function AppShell() {
   const reloadTree = useCallback(async () => {
     // 아직 보내지 않은 이름이 있으면 먼저 저장한다(아니면 DB의 옛 이름이 트리를 덮는다).
     await saver.flushAll();
-    const list = await api.listTree();
+    // 저장하지 못한(다시 시도 중인) 이름은 DB의 옛 이름 대신 쓴다(다시 열 때도 고친 이름이 보이게).
+    const list = (await api.listTree()).map((n) => {
+      const title = saver.pendingTitle(n.id);
+      return title === null ? n : { ...n, title };
+    });
     setNodes(list);
     return indexTree(list);
   }, [saver]);
@@ -122,16 +127,15 @@ export function AppShell() {
       const seq = ++openSeq.current;
       setView("page");
       const prev = openIdRef.current;
-      // 열 페이지의 저장이 진행 중이면 그것도 끝난 뒤에 읽는다(DB의 옛 본문을 열지 않게).
-      await Promise.all([saver.flush(id), prev !== null && prev !== id ? saver.flush(prev) : null]);
+      // 저장은 보내기만 하고 끝나기를 기다리지 않는다. DB가 잠겨 있으면 저장이 몇 초씩 걸려 그동안 본문이 비기 때문이다.
+      // 열 페이지는 아래에서 저장 대기분을 DB 본문보다 앞세우므로 옛 본문으로 덮이지 않는다.
+      if (prev !== null && prev !== id) void saver.flush(prev);
       try {
-        // 저장 대기분(실패·다시 시도 중인 것 포함)이 있으면 DB 본문 대신 그것으로 연다(pm 결정).
-        // 읽는 사이 그 저장이 끝나도 놓치지 않게 읽기 전 값도 본다.
-        const before = saver.pendingContent(id);
-        const loaded = opts.created ?? (await api.getPage(id));
+        // 저장 대기분(실패·다시 시도·보내는 중인 것)이 있으면 DB를 읽지 않고 그것으로 바로 연다(pm 결정).
+        // DB 연결은 하나라 저장이 잠금을 기다리는 동안에는 읽기도 그 뒤에 줄을 선다.
+        const content = saver.pendingContent(id) ?? opts.created?.content ?? (await api.getPage(id)).content;
         if (seq !== openSeq.current) return;
-        const pending = saver.pendingContent(id) ?? before;
-        setPage(pending ? { ...loaded, content: pending } : loaded);
+        setPage({ id, content });
         setOpenId(id);
         openIdRef.current = id;
         setSaveStatus(saver.status(id));
@@ -602,6 +606,7 @@ export function AppShell() {
               onTitleChange={(t) => renamePage(page.id, t)}
               onContentChange={(doc: JSONContent) => saver.setContent(page.id, doc)}
               onEditor={onEditor}
+              onNotify={notify}
             />
           ) : null}
         </div>
