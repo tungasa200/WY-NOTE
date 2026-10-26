@@ -4,6 +4,7 @@ mod db;
 mod error;
 mod export;
 mod secret;
+mod window_fit;
 
 use tauri::webview::NewWindowResponse;
 use tauri::{Manager, RunEvent, Url, WebviewWindowBuilder};
@@ -39,6 +40,8 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
+        // 저장된 창 상태를 최소 크기·화면 안으로 고친다. window-state가 파일을 읽기 전이어야 한다(P4-3).
+        .plugin(window_fit::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
