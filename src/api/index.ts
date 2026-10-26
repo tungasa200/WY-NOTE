@@ -1,6 +1,7 @@
 // Tauri 명령(docs/계약-DB.md 8절)을 감싼 타입 있는 클라이언트. 화면은 invoke를 직접 부르지 않고 이것만 쓴다.
 // Tauri 밖(브라우저 개발)에서는 메모리 가짜 구현(mock.ts)으로 바뀐다. 실패하면 AppError로 reject한다.
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import type { ExportRequest, ExportResult } from "../export/exportTree";
 import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode } from "../lib/db-types";
 
 export type Backend = {
@@ -23,6 +24,8 @@ export type Backend = {
   /** ext: png, jpg, jpeg, gif, webp, svg */
   saveAttachment(pageId: PageId, ext: string, bytes: Uint8Array): Promise<{ fileName: string }>;
   getDataDir(): Promise<string>;
+  /** F-06(docs/계약-AI.md 5.3). Rust가 폴더 선택 창을 띄운다. 고르지 않으면 { cancelled: true }. */
+  exportMarkdown(req: ExportRequest): Promise<ExportResult>;
 };
 
 const tauriBackend: Backend = {
@@ -45,6 +48,7 @@ const tauriBackend: Backend = {
   saveAttachment: (pageId, ext, bytes) =>
     invoke("save_attachment", bytes, { headers: { "x-page-id": String(pageId), "x-ext": ext } }),
   getDataDir: () => invoke("get_data_dir"),
+  exportMarkdown: (req) => invoke("export_markdown", req),
 };
 
 let backend: Backend | null = null;

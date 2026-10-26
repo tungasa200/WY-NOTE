@@ -1,6 +1,7 @@
 // 브라우저 개발용 가짜 백엔드. 계약 4절·8절 규칙을 메모리에서 흉내 내고, 새로고침해도 남게 localStorage에 둔다.
 // Tauri 안에서는 쓰지 않는다. 검색은 단순 포함 검사만 한다(trigram·LIKE 구분 없음).
 import { EMPTY_DOC } from "../editor/Editor";
+import { isAttachmentName } from "../export/exportTree";
 import type { AppError, JSONContent, Page, PageId, TreeNode } from "../lib/db-types";
 import type { Backend } from "./index";
 
@@ -236,6 +237,30 @@ export function createMockBackend(): Backend {
         return { fileName: `mock-${Date.now()}.${ext}` };
       }),
     getDataDir: () => read(() => "(브라우저 mock: localStorage)"),
+    // 파일은 쓰지 않는다. localStorage "wy-note-mock-export"를 cancel·fail로 두면 취소·실패를 흉내 낸다.
+    exportMarkdown: ({ root, attachments }) =>
+      new Promise((resolve, reject) =>
+        setTimeout(() => {
+          let mode: string | null = null;
+          try {
+            mode = localStorage.getItem("wy-note-mock-export");
+          } catch {
+            // 위와 같다.
+          }
+          if (mode === "cancel") return resolve({ cancelled: true });
+          if (mode === "fail") return reject({ kind: "Io", message: "mock 쓰기 실패" } satisfies AppError);
+          if (!attachments.every(isAttachmentName)) return reject({ kind: "InvalidInput", message: "첨부 이름" } satisfies AppError);
+          const count = (n: typeof root): number => 1 + n.children.reduce((s, c) => s + count(c), 0);
+          // mock 첨부는 실제 파일이 없으므로 모두 "찾지 못함"으로 돌려준다.
+          resolve({
+            cancelled: false,
+            dir: `C:\\Users\\mock\\Documents\\${root.title.trim() || "제목 없음"}`,
+            fileCount: count(root),
+            imageCount: 0,
+            missingImages: attachments,
+          });
+        }, 600),
+      ),
   };
 }
 

@@ -53,6 +53,17 @@ type Ctx = {
   inTableCell: boolean;
 };
 
+/** 여러 페이지의 알림을 종류별로 더한다(하위 포함 내보내기에서 한 번에 보여 줄 때). */
+export function mergeWarnings(list: ExportWarning[]): ExportWarning[] {
+  const counts = new Map<ExportWarningKind, number>();
+  for (const w of list) counts.set(w.kind, (counts.get(w.kind) ?? 0) + w.count);
+  return toWarnings(counts);
+}
+
+function toWarnings(counts: Map<ExportWarningKind, number>): ExportWarning[] {
+  return [...counts].map(([kind, count]) => ({ kind, count, message: WARNING_TEXT[kind](count) }));
+}
+
 function warn(ctx: Ctx, kind: ExportWarningKind) {
   ctx.counts.set(kind, (ctx.counts.get(kind) ?? 0) + 1);
 }
@@ -65,8 +76,7 @@ export function docToMarkdown(doc: JSONContent, options: MarkdownOptions = {}): 
     inTableCell: false,
   };
   const body = blocks(doc.content ?? [], ctx, "\n\n");
-  const warnings = [...ctx.counts].map(([kind, count]) => ({ kind, count, message: WARNING_TEXT[kind](count) }));
-  return { markdown: body ? body + "\n" : "", images: ctx.images, warnings };
+  return { markdown: body ? body + "\n" : "", images: ctx.images, warnings: toWarnings(ctx.counts) };
 }
 
 // ---------- 블록 ----------
