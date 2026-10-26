@@ -10,6 +10,21 @@ pub enum ErrorKind {
     Db,
     Io,
     Migration,
+    // 계약-AI 4.1
+    NoApiKey,
+    Keyring,
+    Offline,
+    AiTimeout,
+    AiAuth,
+    AiCredit,
+    AiRateLimit,
+    AiOverloaded,
+    AiApi,
+    AiExcluded,
+    AiDailyLimit,
+    InputTooLong,
+    AiBusy,
+    Cancelled,
 }
 
 /// `{ kind, message }`로 직렬화된다. message에는 노트 본문을 넣지 않는다.

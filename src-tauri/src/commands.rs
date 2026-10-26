@@ -26,7 +26,7 @@ impl AppState {
         Self { db: db.map(Mutex::new), data_dir }
     }
 
-    fn conn(&self) -> AppResult<MutexGuard<'_, Connection>> {
+    pub(crate) fn conn(&self) -> AppResult<MutexGuard<'_, Connection>> {
         match &self.db {
             // 다른 명령이 패닉해도 트랜잭션은 drop 때 롤백되므로 연결은 계속 쓸 수 있다.
             Ok(m) => Ok(m.lock().unwrap_or_else(|e| e.into_inner())),
@@ -34,7 +34,7 @@ impl AppState {
         }
     }
 
-    fn attachments_dir(&self) -> PathBuf {
+    pub(crate) fn attachments_dir(&self) -> PathBuf {
         self.data_dir.join("attachments")
     }
 }

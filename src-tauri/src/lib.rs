@@ -1,6 +1,9 @@
+mod ai;
 mod commands;
 mod db;
 mod error;
+mod export;
+mod secret;
 
 use tauri::webview::NewWindowResponse;
 use tauri::{Manager, Url, WebviewWindowBuilder};
@@ -27,6 +30,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             // 실패해도 앱은 띄우고, 명령마다 이 오류를 돌려줘 화면이 알리게 한다.
@@ -37,6 +41,12 @@ pub fn run() {
                 eprintln!("DB 열기 실패: {e}");
             }
             app.manage(commands::AppState::new(db, data_dir));
+            // 실패해도 앱은 띄운다. 키 명령이 Keyring 오류를 돌려준다.
+            if let Err(e) = secret::init() {
+                eprintln!("자격 증명 저장소 준비 실패: {e}");
+            }
+            app.manage(ai::AiState::new());
+            app.manage(export::LastExport::default());
 
             // 창은 tauri.conf.json에서 create=false로 두고 여기서 만든다(탐색 차단을 걸기 위해).
             let config = app.config().app.windows.first().ok_or("창 설정이 없습니다")?.clone();
@@ -71,6 +81,19 @@ pub fn run() {
             commands::set_last_page,
             commands::save_attachment,
             commands::get_data_dir,
+            ai::set_api_key,
+            ai::has_api_key,
+            ai::delete_api_key,
+            ai::ai_summarize,
+            ai::ai_rewrite,
+            ai::ai_ask,
+            ai::ai_cancel,
+            ai::get_ai_status,
+            ai::set_ai_exclude,
+            ai::set_ai_daily_limit,
+            ai::list_ai_usage,
+            export::export_markdown,
+            export::open_export_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
