@@ -32,22 +32,6 @@ export type Backend = {
   exportMarkdown(req: ExportRequest): Promise<ExportResult>;
 };
 
-// 화면 상태 임시 보관: get_ui_state·set_ui_state가 이 가지에 병합되기 전까지 WebView localStorage에 둔다.
-// 병합 뒤에는 tauriBackend의 두 줄을 invoke("get_ui_state") · invoke("set_ui_state", { state })로 바꾸고 이 블록을 지운다.
-const UI_STATE_KEY = "wy-note-ui-state";
-const uiStateStore = {
-  // 저장소를 못 읽으면 reject한다(호출한 쪽이 기본값으로 덮어쓰지 않게). 깨진 값은 저장한 적 없음으로 본다.
-  get: async (): Promise<UiState> => {
-    const raw = localStorage.getItem(UI_STATE_KEY);
-    try {
-      return raw ? (JSON.parse(raw) as UiState) : {};
-    } catch {
-      return {};
-    }
-  },
-  set: async (state: UiState) => localStorage.setItem(UI_STATE_KEY, JSON.stringify(state)),
-};
-
 const tauriBackend: Backend = {
   listTree: () => invoke("list_tree"),
   getPage: (id) => invoke("get_page", { id }),
@@ -68,8 +52,8 @@ const tauriBackend: Backend = {
   saveAttachment: (pageId, ext, bytes) =>
     invoke("save_attachment", bytes, { headers: { "x-page-id": String(pageId), "x-ext": ext } }),
   getDataDir: () => invoke("get_data_dir"),
-  getUiState: uiStateStore.get,
-  setUiState: uiStateStore.set,
+  getUiState: () => invoke("get_ui_state"),
+  setUiState: (state) => invoke("set_ui_state", { state }),
   exportMarkdown: (req) => invoke("export_markdown", req),
 };
 

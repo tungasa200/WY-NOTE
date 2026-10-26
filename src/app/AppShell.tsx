@@ -18,8 +18,6 @@ import "./AppShell.css";
 
 type View = "page" | "trash";
 
-/** core:window:allow-destroy 권한이 들어오면 true로 바꾼다. */
-const CLOSE_SAVE_ENABLED = false;
 const CLOSE_SAVE_TIMEOUT_MS = 3000;
 // 검색 전 저장을 이보다 오래 기다리지 않는다(저장이 멈춰도 검색은 된다).
 const SEARCH_SAVE_WAIT_MS = 1000;
@@ -201,9 +199,9 @@ export function AppShell() {
 
   // 창 닫기(X·Alt+F4): 남은 저장이 끝난 뒤 닫는다. 저장하지 못했으면 닫지 않고 묻는다(결정 db-v2).
   // onCloseRequested는 핸들러를 기다린 뒤 preventDefault가 없으면 스스로 destroy()를 부른다.
-  // destroy에는 capabilities의 core:window:allow-destroy가 필요하다. 권한이 들어오기 전에는 창이 닫히지 않으므로 꺼 둔다.
+  // destroy에는 capabilities의 core:window:allow-destroy가 필요하다(없으면 창이 닫히지 않는다).
   useEffect(() => {
-    if (!CLOSE_SAVE_ENABLED || !isTauri()) return;
+    if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     let disposed = false;
     void getCurrentWindow()
