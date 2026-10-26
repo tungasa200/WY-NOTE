@@ -97,7 +97,15 @@ pub enum AiEvent {
 pub struct AiResult {
     text: String,
     truncated: bool,
+    /// API `stop_reason` 원문(없으면 `"unknown"`). 정상 완료는 `end_turn`·`stop_sequence`뿐(계약-AI 4절).
+    stop_reason: String,
     input_chars: usize,
+}
+
+impl AiResult {
+    fn new(o: client::Outcome, input_chars: usize) -> Self {
+        Self { text: o.text, truncated: o.stop_reason == "max_tokens", stop_reason: o.stop_reason, input_chars }
+    }
 }
 
 #[derive(Serialize)]
@@ -309,7 +317,7 @@ async fn run(
         record_usage(app, &today, input_chars);
     }
     match result {
-        Some(r) => r.map(|o| AiResult { text: o.text, truncated: o.truncated, input_chars }),
+        Some(r) => r.map(|o| AiResult::new(o, input_chars)),
         None if slot.cancelled() => Err(AppError::new(ErrorKind::Cancelled, "중지했습니다")),
         None => Err(AppError::new(ErrorKind::AiApi, "AI 작업이 비정상 종료되었습니다")),
     }
@@ -527,6 +535,21 @@ mod tests {
         assert!(slot.cancelled());
         drop(slot);
         assert!(ai.reserve("b").is_ok());
+    }
+
+    #[test]
+    fn result_stop_reason() {
+        let r = |reason: &str| {
+            let v = serde_json::to_value(AiResult::new(client::Outcome { text: "t".into(), stop_reason: reason.into() }, 3));
+            v.unwrap()
+        };
+        let v = r("max_tokens");
+        assert_eq!((v["truncated"].as_bool(), v["stopReason"].as_str()), (Some(true), Some("max_tokens")));
+        assert_eq!(v["inputChars"], 3);
+        for reason in ["end_turn", "refusal", "unknown"] {
+            let v = r(reason);
+            assert_eq!((v["truncated"].as_bool(), v["stopReason"].as_str()), (Some(false), Some(reason)));
+        }
     }
 
     #[test]
