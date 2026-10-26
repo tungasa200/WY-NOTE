@@ -23,6 +23,9 @@ function assetNameFromUrl(src: string | null): string | null {
   }
 }
 
+/** 첨부 이미지 주소(wyasset)인가. */
+export const isAssetUrl = (src: string | null) => assetNameFromUrl(src) !== null;
+
 const altText = (alt: unknown) => (typeof alt === "string" && alt) || "첨부 이미지";
 
 /**
@@ -77,4 +80,33 @@ export const WyImage = Image.extend({
   },
 });
 
+/** 넣을 수 있는 이미지 형식. SVG는 스크립트가 들어갈 수 있어 뺀다(사용자 결정). */
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+/** 이미지 하나의 크기 상한 20MB(사용자 결정). Rust 쪽 검사와 같은 값이어야 한다. */
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+const EXTENSIONS: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
+
+/**
+ * `data:` 주소를 파일로 바꾼다. 네트워크 요청 없이 문자열만 푼다(fetch는 CSP connect-src에 막힌다).
+ * 형식은 거르지 않는다. 허용 밖 형식도 파일로 돌려주어 넣는 쪽이 이유를 알리게 한다. 주소가 깨졌으면 null.
+ */
+export function dataUrlToFile(url: string): File | null {
+  const match = /^data:([^;,]*)((?:;[^;,]*)*),(.*)$/s.exec(url);
+  if (!match) return null;
+  const type = match[1].toLowerCase() || "text/plain";
+  try {
+    let bytes: Uint8Array<ArrayBuffer>;
+    if (/;base64/i.test(match[2])) {
+      const bin = atob(match[3].replace(/\s/g, ""));
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else {
+      bytes = new TextEncoder().encode(decodeURIComponent(match[3]));
+    }
+    return new File([bytes], `붙여넣은 이미지.${EXTENSIONS[type] ?? "bin"}`, { type });
+  } catch {
+    return null;
+  }
+}
