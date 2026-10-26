@@ -1,0 +1,361 @@
+/* AI 패널(S-07). 바탕은 앱 셸의 .ai-panel(--color-bg-sidebar). 색은 토큰만 쓴다. */
+.ai {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.ai-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--topbar-height);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  flex: none;
+}
+
+.ai-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.ai-usage {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-close {
+  margin-left: auto;
+}
+
+.ai-badge {
+  display: inline-block;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-active);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+
+.ai-badge-offline {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.ai-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+  flex: none;
+}
+
+.ai-tab {
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ai-tab:hover {
+  color: var(--color-text);
+}
+
+.ai-tab[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+.ai-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+.ai-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  line-height: 1.5;
+}
+
+.ai-body .ai-notice,
+.ai-card .ai-notice {
+  margin: var(--space-2) 0 0;
+}
+
+.ai-notice-neutral {
+  background: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.ai-notice-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.ai-notice-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.ai-small {
+  height: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.ai-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ai-task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ai-target {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-task-row .ai-target {
+  flex: 1;
+}
+
+.ai-run,
+.ai-send {
+  min-width: 72px;
+  flex: none;
+}
+
+.ai-hint {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.ai-card {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+}
+
+.ai-card-label {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.ai-card-label:not(:first-child) {
+  margin-top: var(--space-3);
+}
+
+.ai-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  user-select: text;
+}
+
+.ai-original {
+  max-height: 160px;
+  overflow-y: auto;
+  color: var(--color-text-secondary);
+}
+
+.ai-meta {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.ai-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: var(--space-1) 0;
+}
+
+.ai-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  animation: ai-dot 1s ease-in-out infinite;
+}
+
+.ai-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ai-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ai-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-dots span {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* 질문 탭: 대화가 남는 높이를 차지하고 입력칸은 아래에 붙는다. */
+.ai-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+}
+
+.ai-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 80px;
+  overflow-y: auto;
+}
+
+.ai-empty,
+.ai-dropped {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.ai-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+}
+
+.ai-q {
+  align-self: flex-end;
+  max-width: 90%;
+  margin: 0;
+  padding: var(--space-1-5) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-a .ai-actions {
+  margin-top: var(--space-2);
+}
+
+.ai-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  flex: none;
+}
+
+.ai-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-md);
+  resize: vertical;
+}
+
+.ai-input:disabled {
+  background: var(--color-bg-sunken);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.ai-compose-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ai-compose-row .ai-hint {
+  flex: 1;
+}
+
+.ai-live {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.ai-live:empty {
+  display: none;
+}
+
+/* 실행·보내기 버튼은 포커스를 지키려고 disabled 대신 aria-disabled를 쓴다. 모양은 공용 :disabled와 같게. */
+.button[aria-disabled="true"],
+.button[aria-disabled="true"]:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-raised);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* 꺼진 주 버튼: 공용 :disabled는 글자색만 바꿔 진한 바탕 위에서 읽기 어렵다. AI 화면에서는 바탕도 중립으로. */
+.ai .button-primary:disabled,
+.ai-settings .button-primary:disabled {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-raised);
+}
