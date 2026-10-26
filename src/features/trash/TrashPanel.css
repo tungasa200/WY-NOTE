@@ -157,25 +157,6 @@
   cursor: not-allowed;
 }
 
-.trash-btn-danger {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
-  color: var(--color-text-on-danger);
-  font-weight: var(--weight-semibold);
-}
-
-.trash-btn-danger:hover {
-  background: var(--color-danger-hover);
-}
-
-.trash-btn-danger[aria-disabled="true"] {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
-  color: var(--color-text-on-danger);
-  opacity: 0.7;
-  cursor: progress;
-}
-
 .trash-btn-danger-text {
   border-color: transparent;
   background: transparent;
@@ -194,49 +175,6 @@
 
 .trash-row .trash-btn[aria-disabled="true"] {
   cursor: progress;
-}
-
-/* 확인 창(S-03 모양) */
-.confirm-dialog {
-  position: fixed;
-  inset: 22vh auto auto 50%;
-  transform: translateX(-50%);
-  width: 420px;
-  max-width: calc(100vw - 32px);
-  margin: 0;
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-raised);
-  color: var(--color-text);
-  box-shadow: var(--shadow-dialog);
-  font-family: var(--font-sans);
-}
-
-.confirm-dialog::backdrop {
-  background: var(--color-overlay);
-}
-
-.confirm-title {
-  margin: 0 0 var(--space-2);
-  font-size: 16px;
-  font-weight: var(--weight-semibold);
-  overflow-wrap: anywhere;
-}
-
-.confirm-body {
-  margin: 0;
-  font-size: var(--text-md);
-  line-height: 1.55;
-  color: var(--color-text-secondary);
-  overflow-wrap: anywhere;
-}
-
-.confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
 }
 
 @media (max-width: 560px) {

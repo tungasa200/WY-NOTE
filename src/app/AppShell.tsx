@@ -3,32 +3,52 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errorReason } from "../api";
-import type { JSONContent, Page, PageId, TreeNode } from "../lib/db-types";
+import { SearchPanel, type RecentPage } from "../features/search/SearchPanel";
+import { TrashPanel } from "../features/trash/TrashPanel";
+import { ConfirmDialog } from "../lib/ConfirmDialog";
+import type { JSONContent, Page, PageId, TrashItem, TreeNode, UiState } from "../lib/db-types";
+import { displayTitle, quoteObject } from "../lib/title";
 import { PageTree, type PageTreeHandle } from "../tree/PageTree";
-import { ancestors, descendantIds, displayTitle, indexTree } from "../tree/tree";
+import { ancestors, descendantIds, indexTree } from "../tree/tree";
 import { Autosaver, type SaveStatus } from "./autosave";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { CloseSaveDialog } from "./CloseSaveDialog";
 import { PageView } from "./PageView";
 import { Toast, type ToastData } from "./Toast";
 import "./AppShell.css";
 
 type View = "page" | "trash";
 
-const LAYOUT_KEY = "wy-note-layout";
-
 /** core:window:allow-destroy 권한이 들어오면 true로 바꾼다. */
 const CLOSE_SAVE_ENABLED = false;
 const CLOSE_SAVE_TIMEOUT_MS = 3000;
+// 검색 전 저장을 이보다 오래 기다리지 않는다(저장이 멈춰도 검색은 된다).
+const SEARCH_SAVE_WAIT_MS = 1000;
+const RECENT_MAX = 5;
 
-function loadLayout(): { sidebar: boolean; ai: boolean } {
-  try {
-    const v = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null");
-    if (v && typeof v.sidebar === "boolean" && typeof v.ai === "boolean") return v;
-  } catch {
-    // 저장소를 못 쓰면 기본값.
-  }
-  return { sidebar: true, ai: false };
+type Layout = { sidebar: boolean; ai: boolean };
+
+/** 경로 표시("업무 / 회의록"). 경로 띠의 생략 부분과 검색 결과가 함께 쓴다. */
+const pathLabel = (nodes: TreeNode[]) => nodes.map((n) => displayTitle(n.title)).join(" / ");
+
+/** p가 끝나거나 ms가 지나면 끝난다. */
+function within(p: Promise<unknown>, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([p, new Promise<void>((r) => (timer = setTimeout(r, ms)))]).finally(() => clearTimeout(timer));
 }
+
+/** 저장한 화면 상태를 읽는다. 모르는 값·빠진 값은 기본값. */
+function readUiState(v: UiState): { layout: Layout; recent: PageId[] } {
+  const ids = Array.isArray(v.recentPageIds) ? v.recentPageIds.filter((n) => typeof n === "number") : [];
+  return {
+    layout: {
+      sidebar: typeof v.sidebarCollapsed === "boolean" ? !v.sidebarCollapsed : true,
+      ai: typeof v.aiPanelOpen === "boolean" ? v.aiPanelOpen : false,
+    },
+    recent: ids.slice(0, RECENT_MAX),
+  };
+}
+
+type ClosePrompt = { reason: string; titles: string[]; busy: boolean };
 
 export function AppShell() {
   const [nodes, setNodes] = useState<TreeNode[] | null>(null);
@@ -36,7 +56,22 @@ export function AppShell() {
   const [openId, setOpenId] = useState<PageId | null>(null);
   const [focusTitle, setFocusTitle] = useState(false);
   const [view, setView] = useState<View>("page");
-  const [layout, setLayout] = useState(loadLayout);
+  const [layout, setLayout] = useState<Layout>({ sidebar: true, ai: false });
+  // 저장한 화면 상태를 받기 전에 사용자가 바꿨으면, 늦게 온 저장값으로 덮지 않는다.
+  const layoutTouched = useRef(false);
+  const updateLayout = (f: (l: Layout) => Layout) => {
+    layoutTouched.current = true;
+    setLayout(f);
+  };
+  const [recent, setRecent] = useState<PageId[]>([]);
+  // 저장한 화면 상태(마지막으로 보낸 값). 읽기 전·읽지 못했으면(null) 쓰지 않는다(기본값으로 덮지 않게).
+  // 이 화면이 다루지 않는 키(테마·너비)도 그대로 돌려 쓴다.
+  const uiSaved = useRef<UiState | null>(null);
+  const [uiLoaded, setUiLoaded] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  // 휴지통 화면이 열린 채 트리에서 옮기거나 되살리면 목록을 다시 읽게 한다.
+  const [trashVersion, setTrashVersion] = useState(0);
+  const [closePrompt, setClosePrompt] = useState<ClosePrompt | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "saved" });
   const [confirmTrash, setConfirmTrash] = useState<{ id: PageId; count: number } | null>(null);
   const [toast, setToastState] = useState<(ToastData & { id: number }) | null>(null);
@@ -89,6 +124,7 @@ export function AppShell() {
         openIdRef.current = id;
         setSaveStatus(saver.status(id));
         setFocusTitle(!!opts.created);
+        setRecent((r) => (r[0] === id ? r : [id, ...r.filter((x) => x !== id)].slice(0, RECENT_MAX)));
         void api.setLastPage(id).catch(() => {});
         // 열린 페이지의 접힌 조상은 펼친다(S-02).
         const tix = opts.treeIndex ?? ixRef.current;
@@ -110,7 +146,8 @@ export function AppShell() {
     (async () => {
       try {
         const [tix, start] = await Promise.all([reloadTree(), api.getStartPageId()]);
-        if (alive && start !== null) await openPage(start, { treeIndex: tix });
+        if (!alive) return;
+        if (start !== null) await openPage(start, { treeIndex: tix });
       } catch (e) {
         if (alive) setLoadError(errorReason(e));
       }
@@ -120,6 +157,28 @@ export function AppShell() {
     };
   }, [reloadTree, openPage]);
 
+  // 화면 상태(F-07)는 트리와 따로 읽어 오는 대로 반영한다. 읽지 못하면 이번 실행에서는 저장하지 않는다.
+  useEffect(() => {
+    let alive = true;
+    api.getUiState().then(
+      (raw) => {
+        if (!alive) return;
+        // 깨진 값(null·배열 등)은 저장한 적 없음으로 본다.
+        const ui: UiState = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : {};
+        const saved = readUiState(ui);
+        if (!layoutTouched.current) setLayout(saved.layout);
+        // 그새 연 페이지가 앞에 온다.
+        setRecent((r) => [...r, ...saved.recent.filter((id) => !r.includes(id))].slice(0, RECENT_MAX));
+        uiSaved.current = ui;
+        setUiLoaded(true);
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // 새로고침·창 닫기 직전 남은 저장을 보낸다. 저장 호출은 동기적으로 시작된다(autosave.ts).
   useEffect(() => {
     const onUnload = () => void saver.flushAll();
@@ -127,31 +186,57 @@ export function AppShell() {
     return () => window.removeEventListener("pagehide", onUnload);
   }, [saver]);
 
-  // 창 닫기(X·Alt+F4): 남은 저장이 끝난 뒤 닫는다. onCloseRequested는 핸들러를 기다린 뒤 스스로 destroy()를 부른다.
+  /** 남은 저장을 보내고 기다린다(최대 3초). 다 저장됐으면 null, 아니면 화면에 보일 이유. */
+  const saveBeforeClose = useCallback(async (): Promise<ClosePrompt | null> => {
+    await within(saver.flushAll(), CLOSE_SAVE_TIMEOUT_MS);
+    const ids = saver.pendingIds();
+    if (ids.length === 0) return null;
+    const error = saver.firstError();
+    return {
+      reason: error !== undefined ? errorReason(error) : "저장이 3초 안에 끝나지 않았습니다",
+      titles: ids.map((id) => displayTitle(ixRef.current.byId.get(id)?.title ?? "")),
+      busy: false,
+    };
+  }, [saver]);
+
+  // 창 닫기(X·Alt+F4): 남은 저장이 끝난 뒤 닫는다. 저장하지 못했으면 닫지 않고 묻는다(결정 db-v2).
+  // onCloseRequested는 핸들러를 기다린 뒤 preventDefault가 없으면 스스로 destroy()를 부른다.
   // destroy에는 capabilities의 core:window:allow-destroy가 필요하다. 권한이 들어오기 전에는 창이 닫히지 않으므로 꺼 둔다.
   useEffect(() => {
     if (!CLOSE_SAVE_ENABLED || !isTauri()) return;
     let unlisten: (() => void) | undefined;
     let disposed = false;
     void getCurrentWindow()
-      .onCloseRequested(() =>
-        // 저장이 멈춰도 창은 닫히게 상한을 둔다.
-        Promise.race([saver.flushAll(), new Promise<void>((r) => setTimeout(r, CLOSE_SAVE_TIMEOUT_MS))]),
-      )
+      .onCloseRequested(async (event) => {
+        const prompt = await saveBeforeClose();
+        if (prompt === null) return;
+        event.preventDefault();
+        setClosePrompt(prompt);
+      })
       .then((fn) => (disposed ? fn() : (unlisten = fn)));
     return () => {
       disposed = true;
       unlisten?.();
     };
-  }, [saver]);
+  }, [saveBeforeClose]);
+
+  const retryCloseSave = async () => {
+    setClosePrompt((p) => p && { ...p, busy: true });
+    const prompt = await saveBeforeClose();
+    if (prompt === null) void getCurrentWindow().destroy();
+    else setClosePrompt(prompt);
+  };
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-    } catch {
-      // 위와 같다.
-    }
-  }, [layout]);
+    if (!uiLoaded || !uiSaved.current) return;
+    const next = { ...uiSaved.current, sidebarCollapsed: !layout.sidebar, aiPanelOpen: layout.ai, recentPageIds: recent };
+    if (JSON.stringify(next) === JSON.stringify(uiSaved.current)) return; // 바뀐 게 없으면 보내지 않는다
+    // 성공한 뒤에만 기억한다(실패하면 다음 변경 때 다시 보낸다).
+    api.setUiState(next).then(
+      () => (uiSaved.current = next),
+      () => {},
+    );
+  }, [uiLoaded, layout, recent]);
 
   const createPage = useCallback(
     async (parentId: PageId | null) => {
@@ -214,6 +299,7 @@ export function AppShell() {
       showError(e);
       return;
     }
+    setTrashVersion((v) => v + 1);
     const tix = await reloadTree();
     const current = openIdRef.current;
     if (current !== null && bundle.includes(current)) {
@@ -227,12 +313,13 @@ export function AppShell() {
       }
     }
     setToast({
-      message: `"${displayTitle(node.title)}"을 휴지통으로 옮겼습니다`,
+      message: `${quoteObject(node.title)} 휴지통으로 옮겼습니다`,
       action: {
         label: "실행 취소",
         run: async () => {
           try {
             await api.restorePage(id);
+            setTrashVersion((v) => v + 1);
             await reloadTree();
           } catch (e) {
             showError(e);
@@ -242,26 +329,67 @@ export function AppShell() {
     });
   };
 
-  // 전역 단축키(S-01). 검색 Ctrl+K·설정 Ctrl+,은 해당 화면이 붙을 때 더한다.
+  const onRestored = (item: TrashItem) => {
+    void reloadTree();
+    setToast({
+      message: `${quoteObject(item.title)} 복원했습니다`,
+      action: { label: "열기", run: () => void openPage(item.id) },
+    });
+  };
+
+  // 검색어를 보낼 때 저장 대기 중인 내용을 먼저 저장한다(방금 입력한 내용도 찾게, 결정 spec-details).
+  const searchSaved = useCallback(
+    async (query: string) => {
+      await within(saver.flushAll(), SEARCH_SAVE_WAIT_MS);
+      return api.search(query);
+    },
+    [saver],
+  );
+
+  // 전역 단축키(S-01). 설정 Ctrl+,은 설정 화면이 붙을 때 더한다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.altKey || e.shiftKey) return;
       // e.key는 한글 입력 상태에서 자모가 될 수 있어 키 위치(e.code)로 본다.
-      if (e.code === "KeyN") void createPage(null);
-      else if (e.code === "Backslash") setLayout((l) => ({ ...l, sidebar: !l.sidebar }));
-      else if (e.code === "KeyJ") setLayout((l) => ({ ...l, ai: !l.ai }));
-      else return;
-      e.preventDefault();
+      const action = {
+        KeyK: () => setSearchOpen(true),
+        KeyN: () => void createPage(null),
+        Backslash: () => updateLayout((l) => ({ ...l, sidebar: !l.sidebar })),
+        KeyJ: () => updateLayout((l) => ({ ...l, ai: !l.ai })),
+      }[e.code];
+      if (!action) return;
+      e.preventDefault(); // 대화상자가 열려 있어도 WebView 기본 동작(Ctrl+N 새 창 등)은 막는다
+      // 대화상자·메뉴가 열린 동안은 뒤 화면을 바꾸지 않는다.
+      if (!document.querySelector("dialog[open], [role='menu']")) action();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [createPage]);
 
+  // 릴리스에서는 새로 고침을 막는다(편집 상태가 날아간다). 확대(Ctrl+±·휠)는 막지 않는다.
+  // WebView2 기본 오른쪽 클릭 메뉴에도 '새로 고침'이 있어, 글을 고치는 곳(편집기·입력칸) 밖에서는 띄우지 않는다.
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F5" || (e.ctrlKey && !e.altKey && e.code === "KeyR")) e.preventDefault();
+    };
+    const onMenu = (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof Element) || !t.closest("input, textarea, [contenteditable='true']")) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("contextmenu", onMenu);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("contextmenu", onMenu);
+    };
+  }, []);
+
   const openNode = openId !== null ? ix.byId.get(openId) : undefined;
   const path = openId !== null ? ancestors(ix, openId) : [];
   // 깊은 경로는 맨 위 하나와 가까운 둘만 보이고 가운데는 "…"로 줄인다.
   const crumbs = path.length > 3 ? [path[0], null, ...path.slice(-2)] : path;
-  const hiddenCrumbs = path.length > 3 ? path.slice(1, -2).map((n) => displayTitle(n.title)).join(" / ") : "";
+  const hiddenCrumbs = path.length > 3 ? pathLabel(path.slice(1, -2)) : "";
   const empty = nodes !== null && nodes.length === 0;
 
   return (
@@ -276,12 +404,24 @@ export function AppShell() {
               aria-label="사이드바 접기"
               aria-keyshortcuts="Control+\"
               title="사이드바 접기 (Ctrl+\)"
-              onClick={() => setLayout((l) => ({ ...l, sidebar: false }))}
+              onClick={() => updateLayout((l) => ({ ...l, sidebar: false }))}
             >
               ◧
             </button>
           </div>
-          {/* S-05 검색 진입(NOTE-frontend3 컴포넌트) 자리 */}
+          <button
+            type="button"
+            className="sidebar-new sidebar-search"
+            aria-haspopup="dialog"
+            aria-keyshortcuts="Control+K"
+            onClick={() => setSearchOpen(true)}
+          >
+            검색
+            <span className="sidebar-search-keys" aria-hidden="true">
+              <kbd>Ctrl</kbd>
+              <kbd>K</kbd>
+            </span>
+          </button>
           <button
             type="button"
             className="sidebar-new"
@@ -335,7 +475,7 @@ export function AppShell() {
               aria-label="사이드바 펴기"
               aria-keyshortcuts="Control+\"
               title="사이드바 펴기 (Ctrl+\)"
-              onClick={() => setLayout((l) => ({ ...l, sidebar: true }))}
+              onClick={() => updateLayout((l) => ({ ...l, sidebar: true }))}
             >
               ◧
             </button>
@@ -367,7 +507,7 @@ export function AppShell() {
             aria-pressed={layout.ai}
             aria-keyshortcuts="Control+J"
             title="AI 패널 (Ctrl+J)"
-            onClick={() => setLayout((l) => ({ ...l, ai: !l.ai }))}
+            onClick={() => updateLayout((l) => ({ ...l, ai: !l.ai }))}
           >
             AI
           </button>
@@ -402,8 +542,14 @@ export function AppShell() {
               </button>
             </div>
           ) : view === "trash" ? (
-            // S-04 휴지통(NOTE-frontend3 컴포넌트) 자리
-            <section className="content-slot" aria-label="휴지통" />
+            <TrashPanel
+              key={trashVersion}
+              list={api.listTrash}
+              restore={api.restorePage}
+              deletePermanently={api.deletePagePermanently}
+              empty={api.emptyTrash}
+              onRestored={onRestored}
+            />
           ) : empty ? (
             <EmptyState onCreate={() => void createPage(null)} />
           ) : page && openNode ? (
@@ -428,7 +574,7 @@ export function AppShell() {
               type="button"
               className="icon-button"
               aria-label="AI 패널 닫기"
-              onClick={() => setLayout((l) => ({ ...l, ai: false }))}
+              onClick={() => updateLayout((l) => ({ ...l, ai: false }))}
             >
               ✕
             </button>
@@ -438,8 +584,9 @@ export function AppShell() {
 
       {confirmTrash && (
         <ConfirmDialog
-          title={`"${displayTitle(ix.byId.get(confirmTrash.id)?.title ?? "")}"을 휴지통으로 옮길까요?`}
+          title={`${quoteObject(ix.byId.get(confirmTrash.id)?.title ?? "")} 휴지통으로 옮길까요?`}
           confirmLabel="휴지통으로 이동"
+          initialFocus="confirm"
           onConfirm={() => void doTrash(confirmTrash.id)}
           onCancel={() => setConfirmTrash(null)}
           fallbackFocus={() => treeRef.current?.focus(openIdRef.current)}
@@ -451,6 +598,39 @@ export function AppShell() {
           )}
           <p>휴지통에서 언제든 복원할 수 있습니다.</p>
         </ConfirmDialog>
+      )}
+
+      {searchOpen && (
+        <SearchPanel
+          search={searchSaved}
+          recent={recent.flatMap((id): RecentPage[] => {
+            const n = ix.byId.get(id);
+            return n ? [{ pageId: id, title: n.title }] : [];
+          })}
+          pathOf={(id) => pathLabel(ancestors(ix, id))}
+          onOpenPage={async (id) => {
+            // 첫 일치 위치로 스크롤·강조(S-05)는 편집기 쪽 기능이 생기면 query로 붙인다.
+            setSearchOpen(false);
+            await openPage(id);
+            // 연 페이지의 본문으로 포커스를 옮긴다(검색창은 연 곳으로 돌려주지 않는다).
+            // 열지 못했으면(실패·다른 열기가 앞섬) 트리의 열린 페이지로 돌린다.
+            requestAnimationFrame(() => {
+              if (openIdRef.current === id) document.querySelector<HTMLElement>(".editor-body")?.focus();
+              else treeRef.current?.focus(openIdRef.current);
+            });
+          }}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
+
+      {closePrompt && (
+        <CloseSaveDialog
+          reason={closePrompt.reason}
+          titles={closePrompt.titles}
+          busy={closePrompt.busy}
+          onRetry={() => void retryCloseSave()}
+          onCloseAnyway={() => void getCurrentWindow().destroy()}
+        />
       )}
 
       {toast && <Toast key={toast.id} data={toast} onClose={() => setToastState(null)} />}

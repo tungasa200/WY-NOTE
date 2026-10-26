@@ -13,7 +13,8 @@ import {
 } from "react";
 import type { PageId } from "../lib/db-types";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
-import { descendantIds, displayTitle, dropTarget, visibleRows, type DropZone, type TreeIndex } from "./tree";
+import { displayTitle, isUntitled } from "../lib/title";
+import { descendantIds, dropTarget, visibleRows, type DropZone, type TreeIndex } from "./tree";
 import "./PageTree.css";
 
 export type PageTreeHandle = {
@@ -243,7 +244,7 @@ export function PageTree({ ref, ix, selectedId, onOpen, onCreate, onRename, onTo
                   }}
                 />
               ) : (
-                <span className="tree-title" data-untitled={!node.title.trim() || undefined} title={title}>
+                <span className="tree-title" data-untitled={isUntitled(node.title) || undefined} title={title}>
                   {title}
                 </span>
               )}

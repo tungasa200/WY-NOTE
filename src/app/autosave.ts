@@ -146,6 +146,17 @@ export class Autosaver {
     return Promise.all([...this.savers.values()].map((s) => s.flush())).then(() => undefined);
   }
 
+  /** 아직 저장하지 못한 페이지가 있으면 그 오류(창 닫기 확인용). 없으면 undefined. */
+  firstError(): unknown {
+    for (const s of this.savers.values()) if (s.status.state === "error") return s.status.error;
+    return undefined;
+  }
+
+  /** 아직 DB에 가지 않은 내용이 있는 페이지. */
+  pendingIds(): PageId[] {
+    return [...this.savers.values()].filter((s) => s.dirty || s.status.state !== "saved").map((s) => s.id);
+  }
+
   /** 휴지통으로 보낸 페이지는 더 저장하지 않는다(save_page가 NotFound가 된다). */
   discard(ids: Iterable<PageId>) {
     for (const id of ids) {

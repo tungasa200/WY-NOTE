@@ -1,7 +1,7 @@
 // Tauri 명령(docs/계약-DB.md 8절)을 감싼 타입 있는 클라이언트. 화면은 invoke를 직접 부르지 않고 이것만 쓴다.
 // Tauri 밖(브라우저 개발)에서는 메모리 가짜 구현(mock.ts)으로 바뀐다. 실패하면 AppError로 reject한다.
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode } from "../lib/db-types";
+import type { AppError, JSONContent, Page, PageId, SearchHit, TrashItem, TreeNode, UiState } from "../lib/db-types";
 
 export type Backend = {
   listTree(): Promise<TreeNode[]>;
@@ -20,9 +20,29 @@ export type Backend = {
   search(query: string, limit?: number): Promise<SearchHit[]>;
   getStartPageId(): Promise<PageId | null>;
   setLastPage(id: PageId): Promise<void>;
-  /** ext: png, jpg, jpeg, gif, webp, svg */
+  /** ext: png, jpg, jpeg, gif, webp. 그 밖은 UnsupportedType, 20MB 초과는 FileTooLarge. */
   saveAttachment(pageId: PageId, ext: string, bytes: Uint8Array): Promise<{ fileName: string }>;
   getDataDir(): Promise<string>;
+  /** 저장한 적이 없으면 {}. */
+  getUiState(): Promise<UiState>;
+  /** 통째로 바꾼다(16KB 넘으면 InvalidInput). */
+  setUiState(state: UiState): Promise<void>;
+};
+
+// 화면 상태 임시 보관: get_ui_state·set_ui_state가 이 가지에 병합되기 전까지 WebView localStorage에 둔다.
+// 병합 뒤에는 tauriBackend의 두 줄을 invoke("get_ui_state") · invoke("set_ui_state", { state })로 바꾸고 이 블록을 지운다.
+const UI_STATE_KEY = "wy-note-ui-state";
+const uiStateStore = {
+  // 저장소를 못 읽으면 reject한다(호출한 쪽이 기본값으로 덮어쓰지 않게). 깨진 값은 저장한 적 없음으로 본다.
+  get: async (): Promise<UiState> => {
+    const raw = localStorage.getItem(UI_STATE_KEY);
+    try {
+      return raw ? (JSON.parse(raw) as UiState) : {};
+    } catch {
+      return {};
+    }
+  },
+  set: async (state: UiState) => localStorage.setItem(UI_STATE_KEY, JSON.stringify(state)),
 };
 
 const tauriBackend: Backend = {
@@ -45,6 +65,8 @@ const tauriBackend: Backend = {
   saveAttachment: (pageId, ext, bytes) =>
     invoke("save_attachment", bytes, { headers: { "x-page-id": String(pageId), "x-ext": ext } }),
   getDataDir: () => invoke("get_data_dir"),
+  getUiState: uiStateStore.get,
+  setUiState: uiStateStore.set,
 };
 
 let backend: Backend | null = null;
@@ -85,5 +107,11 @@ export function errorReason(e: unknown): string {
       return "파일을 읽거나 쓰지 못했습니다";
     case "Migration":
       return "데이터 파일을 열지 못했습니다";
+    case "FileTooLarge":
+      return "20MB가 넘는 파일은 넣을 수 없습니다";
+    case "UnsupportedType":
+      return "PNG·JPG·GIF·WebP 이미지만 넣을 수 있습니다";
+    default:
+      return "알 수 없는 오류가 났습니다";
   }
 }

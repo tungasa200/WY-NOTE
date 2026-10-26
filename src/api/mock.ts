@@ -1,7 +1,8 @@
 // 브라우저 개발용 가짜 백엔드. 계약 4절·8절 규칙을 메모리에서 흉내 내고, 새로고침해도 남게 localStorage에 둔다.
 // Tauri 안에서는 쓰지 않는다. 검색은 단순 포함 검사만 한다(trigram·LIKE 구분 없음).
 import { EMPTY_DOC } from "../editor/Editor";
-import type { AppError, JSONContent, Page, PageId, TreeNode } from "../lib/db-types";
+import type { AppError, JSONContent, Page, PageId, TreeNode, UiState } from "../lib/db-types";
+import { ancestors, indexTree } from "../tree/tree";
 import type { Backend } from "./index";
 
 type Row = {
@@ -17,7 +18,7 @@ type Row = {
   trashRootId: PageId | null;
 };
 
-type Db = { nextId: number; rows: Row[]; lastPageId: PageId | null };
+type Db = { nextId: number; rows: Row[]; lastPageId: PageId | null; uiState?: UiState };
 
 const KEY = "wy-note-mock-db";
 
@@ -170,8 +171,9 @@ export function createMockBackend(): Backend {
         return { trashedCount: bundle.length };
       }),
     listTrash: () =>
-      read(() =>
-        db.rows
+      read(() => {
+        const ix = indexTree(db.rows.map(toTree));
+        return db.rows
           .filter((r) => r.trashedAt !== null && r.trashRootId === r.id)
           .sort((a, b) => b.trashedAt! - a.trashedAt!)
           .map((r) => ({
@@ -179,8 +181,12 @@ export function createMockBackend(): Backend {
             title: r.title,
             trashedAt: r.trashedAt!,
             descendantCount: db.rows.filter((x) => x.trashRootId === r.id).length - 1,
-          })),
-      ),
+            parentId: r.parentId,
+            // 원래 위치: 최상위부터 부모까지 제목(휴지통에 있는 조상도 포함).
+            path: ancestors(ix, r.id).map((n) => n.title),
+            restoresToRoot: r.parentId === null || !alive(get(r.parentId)),
+          }));
+      }),
     restorePage: (id) =>
       run(() => {
         const top = get(id);
@@ -231,11 +237,18 @@ export function createMockBackend(): Backend {
       }),
     saveAttachment: (_pageId, ext, bytes) =>
       run(() => {
-        if (!["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) fail("InvalidInput", `확장자 ${ext}`);
+        if (!["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) fail("UnsupportedType", `확장자 ${ext}`);
         if (bytes.length === 0) fail("InvalidInput", "빈 파일");
+        if (bytes.length > 20 * 1024 * 1024) fail("FileTooLarge", `${bytes.length}바이트`);
         return { fileName: `mock-${Date.now()}.${ext}` };
       }),
     getDataDir: () => read(() => "(브라우저 mock: localStorage)"),
+    getUiState: () => read(() => structuredClone(db.uiState ?? {})),
+    setUiState: (state) =>
+      run(() => {
+        if (JSON.stringify(state).length > 16 * 1024) fail("InvalidInput", "화면 상태가 16KB를 넘음");
+        db.uiState = structuredClone(state);
+      }),
   };
 }
 

@@ -1,13 +1,8 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useModalDialog } from "../useModalDialog";
+import type { SearchHit } from "../../lib/db-types";
+import { displayTitle, isUntitled } from "../../lib/title";
+import { useModalDialog } from "../../lib/useModalDialog";
 import "./SearchPanel.css";
-
-// 계약-DB.md 8절의 SearchHit과 같은 모양. src/lib/db-types.ts가 생기면 그쪽 타입으로 바꾼다.
-export type SearchHit = {
-  pageId: number;
-  title: string;
-  snippet: { text: string; match: boolean }[];
-};
 
 export type RecentPage = { pageId: number; title: string };
 
@@ -42,8 +37,10 @@ export function SearchPanel({ search, onOpenPage, onClose, pathOf, recent = [] }
   const [active, setActive] = useState(0);
   const [slow, setSlow] = useState(false);
   const listId = useId();
+  // 결과를 골라 닫을 때는 연 곳으로 포커스를 돌리지 않는다(부모가 편집기로 옮긴다).
+  const opened = useRef(false);
 
-  useModalDialog(dialogRef);
+  useModalDialog(dialogRef, { shouldRestore: () => !opened.current });
 
   // 입력이 멈춘 뒤 검색한다. 늦게 온 옛 응답은 버린다.
   useEffect(() => {
@@ -91,7 +88,10 @@ export function SearchPanel({ search, onOpenPage, onClose, pathOf, recent = [] }
     document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, state, listId]);
 
-  const open = (row: Row) => onOpenPage(row.pageId, state.kind === "idle" ? "" : query.trim());
+  const open = (row: Row) => {
+    opened.current = true;
+    onOpenPage(row.pageId, state.kind === "idle" ? "" : query.trim());
+  };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return; // 한글 조합 중 Enter·화살표는 입력기 몫이다.
@@ -172,8 +172,8 @@ export function SearchPanel({ search, onOpenPage, onClose, pathOf, recent = [] }
               onClick={() => open(row)}
             >
               <div className="search-result-top">
-                <span className={row.title ? "search-result-title" : "search-result-title is-untitled"}>
-                  {row.title ? highlight(row.title, terms) : "제목 없음"}
+                <span className={isUntitled(row.title) ? "search-result-title is-untitled" : "search-result-title"}>
+                  {isUntitled(row.title) ? displayTitle(row.title) : highlight(row.title, terms)}
                 </span>
                 {path !== undefined && (
                   <span className="search-result-path" title={path || "최상위"}>

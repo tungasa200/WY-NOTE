@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../../lib/ConfirmDialog";
+import type { TrashItem } from "../../lib/db-types";
+import { displayTitle, isUntitled, josa, quote, quoteObject } from "../../lib/title";
 import "./TrashPanel.css";
-
-// 계약-DB.md 8절의 TrashItem과 같은 모양. src/lib/db-types.ts가 생기면 그쪽 타입으로 바꾼다.
-export type TrashItem = {
-  id: number;
-  title: string;
-  trashedAt: number;
-  descendantCount: number;
-};
 
 type TrashPanelProps = {
   list: () => Promise<TrashItem[]>;
@@ -73,7 +67,7 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
       await reload(indexOf(item.id));
       onRestored?.(item, result);
     } catch {
-      setError(`${object(item.title)} 복원하지 못했습니다. 휴지통에 그대로 있으니 다시 시도해 주세요.`);
+      setError(`${quoteObject(item.title)} 복원하지 못했습니다. 휴지통에 그대로 있으니 다시 시도해 주세요.`);
     } finally {
       setPendingId(null);
     }
@@ -92,7 +86,7 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
       setConfirm(null);
       setError(
         confirm.kind === "one"
-          ? `${object(confirm.item.title)} 지우지 못했습니다. 휴지통에 그대로 있으니 다시 시도해 주세요.`
+          ? `${quoteObject(confirm.item.title)} 지우지 못했습니다. 휴지통에 그대로 있으니 다시 시도해 주세요.`
           : "휴지통을 비우지 못했습니다. 페이지는 그대로 있으니 다시 시도해 주세요.",
       );
     } finally {
@@ -147,7 +141,7 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
             return (
               <li key={item.id} className="trash-row">
                 <div className="trash-row-main">
-                  <span className={item.title ? "trash-row-title" : "trash-row-title is-untitled"} title={displayTitle(item.title)}>
+                  <span className={isUntitled(item.title) ? "trash-row-title is-untitled" : "trash-row-title"} title={displayTitle(item.title)}>
                     {displayTitle(item.title)}
                   </span>
                   {item.descendantCount > 0 && <span className="trash-badge">하위 {count(item.descendantCount)}개</span>}
@@ -189,16 +183,17 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
         <ConfirmDialog
           title={
             confirm.kind === "one"
-              ? `${object(confirm.item.title)} 영구 삭제할까요?`
+              ? `${quoteObject(confirm.item.title)} 영구 삭제할까요?`
               : "휴지통을 비울까요?"
           }
           confirmLabel="영구 삭제"
           busy={busy}
+          busyLabel="지우는 중…"
           onCancel={() => setConfirm(null)}
           onConfirm={() => void onConfirmDelete()}
         >
           {confirm.kind === "one" ? (
-            <>
+            <p>
               {quote(confirm.item.title)}
               {josa(confirm.item.title, "과", "와")}{" "}
               {confirm.item.descendantCount > 0 && (
@@ -207,11 +202,11 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
                 </>
               )}
               첨부 이미지를 지웁니다. 되돌릴 수 없습니다.
-            </>
+            </p>
           ) : (
-            <>
+            <p>
               휴지통의 페이지 <b>{count(totalPages)}개</b>와 첨부 이미지를 모두 지웁니다. 되돌릴 수 없습니다.
-            </>
+            </p>
           )}
         </ConfirmDialog>
       )}
@@ -219,20 +214,7 @@ export function TrashPanel({ list, restore, deletePermanently, empty, onRestored
   );
 }
 
-const displayTitle = (title: string) => title || "제목 없음";
-const quote = (title: string) => `"${displayTitle(title)}"`;
-/** 목적어: "제목"을 / "제목"를 */
-const object = (title: string) => quote(title) + josa(title, "을", "를");
 const count = (n: number) => n.toLocaleString("ko-KR");
-
-/** 받침이 있으면 withBatchim, 없으면 without. 한글·숫자가 아닌 끝 글자는 "을(를)"처럼 둘 다 쓴다. */
-export function josa(title: string, withBatchim: string, without: string): string {
-  const last = displayTitle(title).trim().slice(-1);
-  const code = last.charCodeAt(0);
-  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 ? withBatchim : without;
-  if (/[0-9]/.test(last)) return "013678".includes(last) ? withBatchim : without;
-  return `${withBatchim}(${without})`;
-}
 
 /** 지운 시각. 올해면 "10월 25일 18:40", 아니면 연도를 붙인다. 사용자 PC의 시간대로 보인다. */
 export function formatWhen(ms: number, now = Date.now()): string {
