@@ -22,9 +22,12 @@ fn configure(conn: &Connection) -> AppResult<()> {
     conn.pragma_update_and_check(None, "journal_mode", "WAL", |r| r.get::<_, String>(0))?;
     conn.pragma_update(None, "synchronous", "NORMAL")?;
     conn.pragma_update(None, "foreign_keys", true)?;
-    conn.busy_timeout(Duration::from_millis(5000))?;
+    conn.busy_timeout(BUSY_TIMEOUT)?;
     Ok(())
 }
+
+/// 다른 연결이 DB를 잡고 있을 때 기다리는 시간(계약 3절 busy_timeout=5000).
+pub const BUSY_TIMEOUT: Duration = Duration::from_millis(5000);
 
 /// Unix 밀리초.
 pub fn now_ms() -> i64 {

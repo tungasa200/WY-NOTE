@@ -10,7 +10,8 @@ use serde::Serialize;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, TryLockError};
+use std::time::Duration;
 use tauri::http::{Response, StatusCode, header};
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, State};
@@ -35,11 +36,19 @@ impl AppState {
     }
 
     /// 종료 때 WAL을 본 파일에 합친다(계약 v2 11절 ⑤). 실패해도 데이터는 안전하다(다음 실행 때 합쳐짐).
+    /// 종료를 기다리게 하지 않는다: 다른 명령이 연결을 쓰는 중(DB 잠금 대기 등)이면 건너뛰고,
+    /// 다른 프로세스가 DB를 잡고 있으면 busy_timeout만큼 기다리지 않고 바로 포기한다(P4-3 조사 3).
     pub fn checkpoint(&self) {
-        if let Ok(conn) = self.conn() {
-            // 결과 행(busy, log, checkpointed)을 돌려주는 PRAGMA라 query_row로 부른다.
-            let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
-        }
+        let Ok(m) = &self.db else { return };
+        let conn = match m.try_lock() {
+            Ok(c) => c,
+            Err(TryLockError::Poisoned(e)) => e.into_inner(),
+            Err(TryLockError::WouldBlock) => return,
+        };
+        let _ = conn.busy_timeout(Duration::ZERO);
+        // 결과 행(busy, log, checkpointed)을 돌려주는 PRAGMA라 query_row로 부른다.
+        let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
+        let _ = conn.busy_timeout(crate::db::BUSY_TIMEOUT);
     }
 
     pub(crate) fn attachments_dir(&self) -> PathBuf {
@@ -206,6 +215,27 @@ mod tests {
         let state = AppState::new(Ok(conn), dir.clone());
         state.checkpoint();
         assert_eq!(std::fs::metadata(&wal).unwrap().len(), 0);
+        drop(state);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 다른 연결이 쓰기 잠금을 잡고 있거나 명령이 연결을 쓰는 중이어도 종료가 기다리지 않는다(P4-3 조사 3).
+    #[test]
+    fn checkpoint_does_not_wait_on_locks() {
+        let dir = crate::db::temp_dir("ckpt-lock");
+        let path = dir.join("wy-note.db");
+        let conn = crate::db::open(&path).unwrap();
+        conn.execute("INSERT INTO app_state (key, value) VALUES ('k', '1')", []).unwrap();
+        let other = Connection::open(&path).unwrap();
+        other.execute_batch("BEGIN EXCLUSIVE").unwrap();
+        let state = AppState::new(Ok(conn), dir.clone());
+        let t = std::time::Instant::now();
+        state.checkpoint();
+        let held = state.conn().unwrap();
+        state.checkpoint();
+        assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+        drop(held);
+        drop(other);
         drop(state);
         let _ = std::fs::remove_dir_all(&dir);
     }
