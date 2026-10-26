@@ -43,7 +43,8 @@ pub async fn check_key(client: &Client, key: &str) -> AppResult<()> {
 
 pub struct Outcome {
     pub text: String,
-    pub truncated: bool,
+    /// API `stop_reason` 원문. `message_delta`에 없었으면 `"unknown"`(계약-AI 4절).
+    pub stop_reason: String,
 }
 
 /// `/v1/messages`를 스트리밍으로 부른다. 200 응답이 시작되면 `on_started`를 부르고,
@@ -68,14 +69,14 @@ pub async fn stream_message(
     on_started();
     let request_id = header_str(&res, "request-id");
     let mut parser = SseParser::default();
-    let mut out = Outcome { text: String::new(), truncated: false };
+    let mut out = Outcome { text: String::new(), stop_reason: "unknown".into() };
     while let Some(chunk) = res.chunk().await.map_err(read_err)? {
         let from = out.text.len();
         let mut done = false;
         for ev in parser.push(&chunk) {
             match handle_event(&ev, &request_id)? {
                 Step::Delta(t) => out.text.push_str(&t),
-                Step::Stop(reason) => out.truncated = reason == "max_tokens",
+                Step::Stop(reason) => out.stop_reason = reason,
                 Step::Done => done = true,
                 Step::Skip => {}
             }

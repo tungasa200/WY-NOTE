@@ -146,21 +146,8 @@ mod tests {
     use super::*;
     use crate::db::pages::{create_page, trash_page};
 
-    /// TODO(NOTE-backend1의 V2 병합 뒤 삭제): 이 가지에는 아직 V2 마이그레이션이 없어 테스트에서만 같은 DDL을 덧붙인다.
     fn conn() -> Connection {
-        let c = crate::db::open_memory();
-        let has_v2: bool = c
-            .query_row("SELECT count(*) > 0 FROM pragma_table_info('pages') WHERE name = 'ai_exclude'", [], |r| r.get(0))
-            .unwrap();
-        if !has_v2 {
-            c.execute_batch(
-                "ALTER TABLE pages ADD COLUMN ai_exclude INTEGER NOT NULL DEFAULT 0 CHECK (ai_exclude IN (0, 1, 2));
-                 CREATE TABLE ai_usage (day TEXT PRIMARY KEY, calls INTEGER NOT NULL DEFAULT 0,
-                   input_chars INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;",
-            )
-            .unwrap();
-        }
-        c
+        crate::db::open_memory()
     }
 
     #[test]
