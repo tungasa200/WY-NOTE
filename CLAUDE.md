@@ -27,7 +27,8 @@
 - 타입 검사 + 프론트 빌드: `npm run build`
 - Rust 검사: `src-tauri`에서 `cargo check` (cargo가 PATH에 없으면 `%USERPROFILE%\.cargo\bin`(bash는 `$HOME/.cargo/bin`)을 PATH 앞에 붙인다)
 - 릴리스 빌드: `npm run tauri build` (약 1분 30초~3분, 설치 파일은 `src-tauri/target/release/bundle/`)
-- 테스트·lint 설정은 아직 없다. 생기면 여기에 적는다.
+- 검사 스크립트(프로젝트 루트): `node scripts/check-markdown.ts`(마크다운 변환), `node scripts/check-ai.ts`(AI 화면 로직). Rust는 `src-tauri`에서 `cargo test -j 2`
+- lint 설정은 아직 없다. 생기면 여기에 적는다.
 
 ## 지켜야 할 것
 - 오프라인 완결(NF-06): AI 호출 말고는 네트워크 요청 금지. 원격 글꼴·CDN·분석 도구·업데이트 확인 금지. 글꼴·아이콘은 앱에 포함한다.
