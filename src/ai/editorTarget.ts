@@ -18,13 +18,16 @@ export type Watch = {
 export type AiTarget = {
   /** 빈 선택이면 null. */
   selection(): Snapshot | null;
-  /** 저장 전 편집까지 포함한 본문 평문(계약-AI 4절 "보낼 때 시점"). */
+  /** 저장 전 편집까지 포함한 본문 평문(계약-AI 4절 "보낼 때 시점"). 본문이 그대로면 앞서 만든 값을 돌려준다. */
   docText(): string;
-  /** 선택·본문이 바뀌면 부른다. 해제 함수를 돌려준다. */
-  subscribe(fn: () => void): () => void;
+  /** 선택·본문이 바뀌면 키 한 번에 한 번 부른다(docChanged: 본문이 바뀌었나). 해제 함수를 돌려준다. */
+  subscribe(fn: (docChanged: boolean) => void): () => void;
   watch(snap: Snapshot, onStale: () => void): Watch;
-  /** 커서 자리에, 선택이 있으면 선택 끝 바로 뒤에 넣는다. 선택한 글은 지우지 않는다(F-08.1, 세 탭 공통). */
-  insertAtCursor(text: string): void;
+  /**
+   * 새 문단(들)로 넣는다. 선택 끝(선택이 없으면 커서)이 든 최상위 블록 바로 아래에 넣고, 블록을 쪼개지 않는다.
+   * 목록·코드 블록 안이어도 같다. 선택한 글은 지우지 않는다(F-08.1, 세 탭 공통, pm 결정).
+   */
+  insertBelow(text: string): void;
 };
 
 const BLOCK_SEP = "\n";
@@ -37,6 +40,8 @@ function content(text: string) {
 }
 
 export function createEditorTarget(editor: Editor): AiTarget {
+  // 문서 전체 평문은 길다(5만 자). ProseMirror 문서는 바뀌면 새 객체이므로 같은 문서면 다시 만들지 않는다.
+  let cached: { doc: unknown; text: string } | null = null;
   return {
     selection() {
       const { from, to, empty } = editor.state.selection;
@@ -44,13 +49,22 @@ export function createEditorTarget(editor: Editor): AiTarget {
       const text = editor.state.doc.textBetween(from, to, BLOCK_SEP);
       return text.trim() ? { from, to, text } : null;
     },
-    docText: () => editor.getText(),
+    docText() {
+      const doc = editor.state.doc;
+      if (cached?.doc !== doc) cached = { doc, text: editor.getText() };
+      return cached.text;
+    },
     subscribe(fn) {
-      editor.on("selectionUpdate", fn);
-      editor.on("update", fn);
+      // update와 selectionUpdate는 글자 하나에 둘 다 온다. transaction 하나로 받는다.
+      // appendTransaction(붙여넣기 정리 등)이 바꾼 것도 받는다.
+      const on = ({ transaction: tr, appendedTransactions: more = [] }: { transaction: Transaction; appendedTransactions?: Transaction[] }) => {
+        const trs = [tr, ...more];
+        const docChanged = trs.some((t) => t.docChanged);
+        if (docChanged || trs.some((t) => t.selectionSet)) fn(docChanged);
+      };
+      editor.on("transaction", on);
       return () => {
-        editor.off("selectionUpdate", fn);
-        editor.off("update", fn);
+        editor.off("transaction", on);
       };
     },
     watch(snap, onStale) {
@@ -91,10 +105,15 @@ export function createEditorTarget(editor: Editor): AiTarget {
         dispose: stop,
       };
     },
-    insertAtCursor: (text) => {
-      const c = content(text);
-      if (!c.length || editor.isDestroyed) return;
-      editor.chain().focus().insertContentAt(editor.state.selection.to, c).run();
+    insertBelow: (text) => {
+      const paras = textToParagraphs(text);
+      if (!paras.length || editor.isDestroyed) return;
+      const { selection, doc } = editor.state;
+      // 선택이 다음 블록 맨 앞에서 끝나면(줄 끝까지 끌어 고른 경우) 그 블록은 고른 게 아니다. 한 칸 앞을 본다.
+      const $to = !selection.empty && selection.$to.parentOffset === 0 ? doc.resolve(selection.to - 1) : selection.$to;
+      // 깊이 0이면(최상위 블록을 통째로 고른 경우 등) 이미 블록 사이 자리다.
+      const at = $to.depth === 0 ? $to.pos : $to.after(1);
+      editor.chain().focus().insertContentAt(at, paras).scrollIntoView().run();
     },
   };
 }

@@ -1,6 +1,8 @@
-// 편집 영역의 한 페이지: 제목 + 편집기(화면설계 S-06). 편집기는 Editor의 props(content, onChange)만 쓴다.
+// 편집 영역의 한 페이지: 제목 + 편집기(화면설계 S-06). 편집기는 Editor의 props(content, onChange, onImageUpload)만 쓴다.
 import { useRef } from "react";
+import { api } from "../api";
 import { Editor, type EditorInstance } from "../editor/Editor";
+import { imageExt } from "../editor/image";
 import type { JSONContent, Page } from "../lib/db-types";
 
 type Props = {
@@ -16,6 +18,9 @@ type Props = {
 
 export function PageView({ page, title, focusTitle, onTitleChange, onContentChange, onEditor }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  // 이미지를 이 페이지의 첨부로 저장하고 파일 이름을 받는다(F-02.6). 형식·크기는 편집기가 먼저 거른다(P3-5).
+  const uploadImage = async (file: File) =>
+    (await api.saveAttachment(page.id, imageExt(file.type), new Uint8Array(await file.arrayBuffer()))).fileName;
 
   return (
     <article className="page">
@@ -38,7 +43,13 @@ export function PageView({ page, title, focusTitle, onTitleChange, onContentChan
         }}
       />
       <div ref={bodyRef} className="page-body">
-        <Editor content={page.content} onChange={onContentChange} autofocus={focusTitle ? false : "end"} onEditor={onEditor} />
+        <Editor
+          content={page.content}
+          onChange={onContentChange}
+          autofocus={focusTitle ? false : "end"}
+          onEditor={onEditor}
+          onImageUpload={uploadImage}
+        />
       </div>
     </article>
   );

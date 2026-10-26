@@ -125,9 +125,12 @@ export function AppShell() {
       // 열 페이지의 저장이 진행 중이면 그것도 끝난 뒤에 읽는다(DB의 옛 본문을 열지 않게).
       await Promise.all([saver.flush(id), prev !== null && prev !== id ? saver.flush(prev) : null]);
       try {
+        // 저장 대기분(실패·다시 시도 중인 것 포함)이 있으면 DB 본문 대신 그것으로 연다(pm 결정).
+        // 읽는 사이 그 저장이 끝나도 놓치지 않게 읽기 전 값도 본다.
+        const before = saver.pendingContent(id);
         const loaded = opts.created ?? (await api.getPage(id));
         if (seq !== openSeq.current) return;
-        const pending = saver.pendingContent(id);
+        const pending = saver.pendingContent(id) ?? before;
         setPage(pending ? { ...loaded, content: pending } : loaded);
         setOpenId(id);
         openIdRef.current = id;
@@ -202,7 +205,7 @@ export function AppShell() {
     if (ids.length === 0) return null;
     const error = saver.firstError();
     return {
-      reason: error !== undefined ? errorReason(error) : "저장이 3초 안에 끝나지 않았습니다",
+      reason: error !== undefined ? errorReason(error) : "저장이 끝나지 않았습니다",
       titles: ids.map((id) => displayTitle(ixRef.current.byId.get(id)?.title ?? "")),
       busy: false,
     };
@@ -361,6 +364,8 @@ export function AppShell() {
    */
   const leavePage = useCallback(
     (to: Exclude<View, "page">) => {
+      // 아직 읽는 중인 페이지 열기는 버린다(늦게 도착해 이 화면 뒤에서 열리지 않게).
+      openSeq.current++;
       if (openIdRef.current !== null) void saver.flush(openIdRef.current);
       setPage(null);
       setView(to);
@@ -661,6 +666,7 @@ export function AppShell() {
           busy={closePrompt.busy}
           onRetry={() => void retryCloseSave()}
           onCloseAnyway={() => void getCurrentWindow().destroy()}
+          onDismiss={() => setClosePrompt(null)}
         />
       )}
 

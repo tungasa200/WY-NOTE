@@ -20,8 +20,13 @@ const TABS: { id: Tab; label: string }[] = [
 type Run = "streaming" | "done" | "stopped" | "error";
 
 type SelResult = {
+  /** 요청 id. 늦게 온 응답이 새 결과를 덮지 않게 맞춰 본다. */
+  id: string;
+  /** 요청한 페이지. 다른 페이지에서는 보이지 않는다(페이지를 바꾼 첫 화면에서도). */
+  page: PageId;
   snap: Snapshot;
-  watch: Watch;
+  /** 다듬기만: 바꾸기 범위를 지켜본다. 요약은 바꾸지 않으므로 없다. */
+  watch?: Watch;
   text: string;
   state: Run;
   truncated: boolean;
@@ -87,38 +92,54 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
-  // 선택·본문 길이는 편집할 때마다 바뀐다.
+  // 선택은 편집할 때마다 바뀐다. 본문 길이(문서 전체 평문)는 질문 탭에서만 쓰므로 그때만,
+  // 입력이 잠깐 멈췄을 때 센다(NF-04: 5만 자 문서에서 키마다 전체 평문을 만들지 않게).
   const [sel, setSel] = useState<Snapshot | null>(null);
   const [docLen, setDocLen] = useState(0);
+  const needDocLen = tab === "ask";
   useEffect(() => {
     if (!target) {
       setSel(null);
       setDocLen(0);
       return;
     }
-    const read = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const readLen = () => setDocLen(charCount(target.docText()));
+    const read = (docChanged: boolean) => {
       // 같은 선택이면 이전 값을 그대로 둬 패널을 다시 그리지 않는다(글자 입력마다 불린다).
       const next = target.selection();
       setSel((prev) => (prev && next && prev.from === next.from && prev.to === next.to && prev.text === next.text ? prev : next));
-      setDocLen(charCount(target.docText()));
+      if (docChanged && needDocLen) {
+        clearTimeout(timer);
+        timer = setTimeout(readLen, DOC_LEN_DELAY_MS);
+      }
     };
-    read();
-    return target.subscribe(read);
-  }, [target]);
-
-  // 페이지를 바꾸거나 패널을 닫으면 진행 중인 요청을 멈추고(받을 곳이 없으면 크레딧만 쓴다)
-  // 요약·다듬기 결과는 버린다(대화는 페이지별로 남는다).
-  // 패널을 닫으면(언마운트) React는 상태 갱신 함수를 부르지 않으므로, 지켜보기 해제는 ref로 직접 한다.
-  const watchesRef = useRef<{ summary?: Watch; rewrite?: Watch }>({});
-  watchesRef.current = { summary: summary?.watch, rewrite: rewrite?.watch };
-  useEffect(() => {
+    read(false);
+    if (needDocLen) readLen();
+    const off = target.subscribe(read);
     return () => {
-      if (busyRef.current) void aiApi.cancel(busyRef.current.id).catch(() => {});
-      watchesRef.current.summary?.dispose();
-      watchesRef.current.rewrite?.dispose();
+      off();
+      clearTimeout(timer);
+    };
+  }, [target, needDocLen]);
+
+  // 페이지를 바꾸거나 패널을 닫으면 진행 중인 요청을 멈춘다(받을 곳이 없으면 크레딧만 쓴다).
+  // 설정·휴지통에 갔다가 같은 페이지로 돌아오면 받은 요약·다듬기 결과는 남기고, 다른 페이지를 열면 버린다(pm 결정).
+  // 대화는 페이지별로 남는다. 패널을 닫으면(언마운트) 지켜보기 해제는 ref로 직접 한다.
+  const watchRef = useRef<Watch | undefined>(undefined);
+  watchRef.current = rewrite?.watch;
+  const resultPage = useRef(pageId);
+  useEffect(() => () => watchRef.current?.dispose(), []);
+  useEffect(() => {
+    if (pageId !== null && pageId !== resultPage.current) {
+      resultPage.current = pageId;
+      watchRef.current?.dispose();
       setSummary(null);
       setRewrite(null);
       setAskNotice("");
+    }
+    return () => {
+      if (busyRef.current) void aiApi.cancel(busyRef.current.id).catch(() => {});
     };
   }, [pageId]);
 
@@ -181,15 +202,19 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
     if (!snap || charCount(snap.text) > AI_INPUT_LIMIT) return;
     const set = which === "summarize" ? setSummary : setRewrite;
     const requestId = crypto.randomUUID();
-    const watch = target.watch(snap, () => set((r) => (r && r.watch === watch ? { ...r, stale: true } : r)));
+    // 바꾸기는 다듬기에만 있다. 요약은 범위를 지켜보지 않는다.
+    const watch =
+      which === "rewrite"
+        ? target.watch(snap, () => set((r) => (r && r.id === requestId ? { ...r, stale: true } : r)))
+        : undefined;
     set((old) => {
-      old?.watch.dispose();
-      return { snap, watch, text: "", state: "streaming", truncated: false, stale: false };
+      old?.watch?.dispose();
+      return { id: requestId, page: pageId, snap, watch, text: "", state: "streaming", truncated: false, stale: false };
     });
     setBusy({ id: requestId, tab: which });
-    const patch = (p: Partial<SelResult>) => set((r) => (r && r.watch === watch ? { ...r, ...p } : r));
+    const patch = (p: Partial<SelResult>) => set((r) => (r && r.id === requestId ? { ...r, ...p } : r));
     // 응답이 끝난 뒤 늦게 온 조각은 버린다(Channel 순서는 invoke 응답과 보장되지 않는다).
-    const onDelta = (t: string) => set((r) => (r && r.watch === watch && r.state === "streaming" ? { ...r, text: r.text + t } : r));
+    const onDelta = (t: string) => set((r) => (r && r.id === requestId && r.state === "streaming" ? { ...r, text: r.text + t } : r));
     const req = { requestId, pageId, today: localDay(), text: snap.text };
     try {
       const res: AiResult = await (which === "summarize" ? aiApi.summarize(req, onDelta) : aiApi.rewrite(req, onDelta));
@@ -203,18 +228,27 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
   };
 
   /** 질의응답 대상: 본문이 2만 자 이하면 전체, 넘으면 선택 영역(F-08.3). */
+  const askTargetFor = (len: number): { label: string; text: () => string } | null =>
+    !target
+      ? null
+      : len <= AI_INPUT_LIMIT
+        ? { label: `대상: 이 페이지 전체 · ${fmt(len)}자`, text: () => target.docText() }
+        : sel
+          ? { label: `대상: 선택 영역 ${fmt(charCount(sel.text))}자`, text: () => target.selection()?.text ?? "" }
+          : null;
   const overDoc = docLen > AI_INPUT_LIMIT;
-  const askTarget: { label: string; text: () => string } | null = !target
-    ? null
-    : !overDoc
-      ? { label: `대상: 이 페이지 전체 · ${fmt(docLen)}자`, text: () => target.docText() }
-      : sel
-        ? { label: `대상: 선택 영역 ${fmt(charCount(sel.text))}자`, text: () => target.selection()?.text ?? "" }
-        : null;
+  const askTarget = askTargetFor(docLen);
 
   const send = async () => {
     const q = question.trim();
-    if (!q || !askTarget || pageId === null || !canRun || !target || busyRef.current) return;
+    if (!q || pageId === null || !canRun || !target || busyRef.current) return;
+    // 화면의 길이는 입력이 멈춘 뒤에 센다. 보낼 때는 지금 본문으로 대상을 다시 정한다(붙여넣은 직후 Enter).
+    const len = charCount(target.docText());
+    const askTarget = askTargetFor(len);
+    if (!askTarget) {
+      setDocLen(len); // 넘은 길이를 바로 반영해 '20,000자를 넘어' 안내를 띄운다.
+      return;
+    }
     const context = askTarget.text();
     // 실패·중지로 중간에 끊긴 답과 정상으로 끝나지 않은 답(거부 등)은 완성된 답처럼 보내지 않는다.
     const pairs = messages.filter((m) => m.state === "done" && !m.incomplete).map((m) => ({ question: m.question, answer: m.answer }));
@@ -269,8 +303,14 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
 
   const selLen = sel ? charCount(sel.text) : 0;
   const selOver = selLen > AI_INPUT_LIMIT;
-  // 바꾸기·삽입 공통: 정상 완료이고 그 뒤 본문이 바뀌지 않았을 때만.
-  const canPutRewrite = !!target && !!rewrite && insertable(rewrite, rewrite.text) && !rewrite.stale;
+  // 삽입은 정상 완료면 된다(새 블록으로 넣으니 원문이 바뀌어도 괜찮다). 바꾸기는 그 뒤 원문이 그대로일 때만.
+  // 결과는 요청한 페이지에서만 보인다. 설정·휴지통에 있는 동안은 숨기고, 같은 페이지로 돌아오면 다시 보인다.
+  const shownSummary = summary?.page === pageId ? summary : null;
+  const shownRewrite = rewrite?.page === pageId ? rewrite : null;
+  // 삽입은 정상 완료면 된다(새 블록으로 넣으니 원문이 바뀌어도 괜찮다). 바꾸기는 그 뒤 원문이 그대로일 때만.
+  // 이미 바꾸기를 했으면 같은 글이 두 번 들어가지 않게 삽입도 끈다.
+  const canInsertRewrite = !!target && !!shownRewrite && !shownRewrite.replaced && insertable(shownRewrite, shownRewrite.text);
+  const canReplace = canInsertRewrite && !shownRewrite?.stale;
 
   return (
     <div className="ai">
@@ -324,21 +364,21 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
             onRun={() => void runSelection("summarize")}
             onStop={stop}
           >
-            {summary && (
+            {shownSummary && (
               <ResultCard
-                result={summary}
+                result={shownSummary}
                 onRetry={canRun && sel && !selOver ? () => void runSelection("summarize") : undefined}
                 actions={
                   <>
                     <button
                       type="button"
                       className="button"
-                      disabled={!target || !insertable(summary, summary.text)}
-                      onClick={() => target?.insertAtCursor(summary.text)}
+                      disabled={!target || !insertable(shownSummary, shownSummary.text)}
+                      onClick={() => target?.insertBelow(shownSummary.text)}
                     >
                       삽입
                     </button>
-                    <CopyButton text={summary.text} disabled={summary.state === "streaming"} onCopy={copy} />
+                    <CopyButton text={shownSummary.text} disabled={shownSummary.state === "streaming"} onCopy={copy} />
                   </>
                 }
               />
@@ -358,19 +398,19 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
             onRun={() => void runSelection("rewrite")}
             onStop={stop}
           >
-            {rewrite && (
+            {shownRewrite && (
               <ResultCard
-                result={rewrite}
-                original={rewrite.snap.text}
+                result={shownRewrite}
+                original={shownRewrite.snap.text}
                 onRetry={canRun && sel && !selOver ? () => void runSelection("rewrite") : undefined}
                 actions={
                   <>
                     <button
                       type="button"
                       className="button button-primary"
-                      disabled={!canPutRewrite}
+                      disabled={!canReplace}
                       onClick={() => {
-                        if (rewrite.watch.replace(rewrite.text)) setRewrite((r) => r && { ...r, stale: true, replaced: true });
+                        if (shownRewrite.watch?.replace(shownRewrite.text)) setRewrite((r) => r && { ...r, stale: true, replaced: true });
                       }}
                     >
                       바꾸기
@@ -378,12 +418,12 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
                     <button
                       type="button"
                       className="button"
-                      disabled={!canPutRewrite}
-                      onClick={() => target?.insertAtCursor(rewrite.text)}
+                      disabled={!canInsertRewrite}
+                      onClick={() => target?.insertBelow(shownRewrite.text)}
                     >
                       삽입
                     </button>
-                    <CopyButton text={rewrite.text} disabled={rewrite.state === "streaming"} onCopy={copy} />
+                    <CopyButton text={shownRewrite.text} disabled={shownRewrite.state === "streaming"} onCopy={copy} />
                   </>
                 }
               />
@@ -422,7 +462,7 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
                     {m.state === "error" && <FailAlert reason={m.error!} />}
                     {m.answer && m.state !== "streaming" && (
                       <div className="ai-actions">
-                        <button type="button" className="button" onClick={() => target?.insertAtCursor(m.answer)} disabled={!target || !insertable(m, m.answer)}>
+                        <button type="button" className="button" onClick={() => target?.insertBelow(m.answer)} disabled={!target || !insertable(m, m.answer)}>
                           삽입
                         </button>
                         <CopyButton text={m.answer} onCopy={copy} />
@@ -629,7 +669,7 @@ function ResultCard({
       ) : (
         result.stale &&
         original !== undefined &&
-        result.state !== "streaming" && <p className="ai-meta">요청한 뒤 원문이 바뀌어 바꾸기·삽입을 할 수 없습니다. 복사해서 쓰세요.</p>
+        result.state !== "streaming" && <p className="ai-meta">요청한 뒤 원문이 바뀌었거나 페이지를 다시 열어 바꾸기를 할 수 없습니다.</p>
       )}
       {result.state === "error" && <FailAlert reason={result.error!} onRetry={onRetry} />}
       {result.text && <div className="ai-actions">{actions}</div>}
@@ -638,6 +678,8 @@ function ResultCard({
 }
 
 const TRUNCATED = "출력 상한에 걸려 결과가 잘렸습니다";
+// 질문 탭의 본문 길이를 입력이 멈춘 뒤 이만큼 지나 센다.
+const DOC_LEN_DELAY_MS = 250;
 
 /**
  * 정상 완료(end_turn·stop_sequence)로 끝난 결과만 노트에 넣는다. 잘림·거부·문맥 초과·중지·실패는 복사만(D-31).

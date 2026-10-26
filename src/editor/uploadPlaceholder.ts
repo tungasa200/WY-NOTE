@@ -14,16 +14,16 @@ function render(files: File[]) {
   for (const file of files) {
     const box = document.createElement("div");
     box.className = "editor-upload-placeholder";
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      box.style.width = `min(100%, ${img.naturalWidth}px)`;
-      box.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
-      box.style.height = "auto";
-      URL.revokeObjectURL(url);
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
+    // blob: URL은 CSP(img-src)에 막힌다. 파일에서 바로 크기만 읽고 비트맵은 곧 놓는다(pm 결정).
+    createImageBitmap(file).then(
+      (bmp) => {
+        box.style.width = `min(100%, ${bmp.width}px)`;
+        box.style.aspectRatio = `${bmp.width} / ${bmp.height}`;
+        box.style.height = "auto";
+        bmp.close();
+      },
+      () => {}, // 읽지 못하면 기본 높이 그대로 둔다.
+    );
     dom.append(box);
   }
   return dom;

@@ -264,7 +264,9 @@ function LimitSection() {
         clearTimeout(savedTimer.current);
         savedTimer.current = setTimeout(() => setSaved(false), 1500);
       } catch (e) {
-        setError(`저장하지 못했습니다: ${errorReason(e, AI_FAIL)}.`);
+        // 모르는 오류면 AI 요청 실패가 아니라 설정 저장 실패로 알린다.
+        const reason = errorReason(e, "");
+        setError(reason ? `저장하지 못했습니다: ${reason}.` : "설정을 저장하지 못했습니다.");
       }
     }, 400);
   };

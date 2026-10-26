@@ -15,6 +15,8 @@ class PageSaver {
   private firstPendingAt: number | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private inflight: Promise<void> | null = null;
+  /** 보내는 중인 본문. 끝나기 전에는 DB에 있다고 볼 수 없다. */
+  private sending: JSONContent | null = null;
   status: SaveStatus = { state: "saved" };
 
   constructor(
@@ -22,8 +24,9 @@ class PageSaver {
     private readonly onStatus: (s: PageSaver) => void,
   ) {}
 
+  /** DB에 아직 들어갔다고 볼 수 없는 가장 새 본문(보내는 중인 것 포함). */
   get pendingContent() {
-    return this.content;
+    return this.content ?? this.sending;
   }
 
   get dirty() {
@@ -62,6 +65,7 @@ class PageSaver {
     this.content = null;
     this.title = null;
     this.firstPendingAt = null;
+    this.sending = content;
     this.setStatus({ state: "saving" });
     // 제목·본문 호출을 await 없이 한꺼번에 보낸다(창 닫기·새로고침 직전 호출이 끊기지 않게).
     const calls = [
@@ -80,6 +84,7 @@ class PageSaver {
         // 없는 페이지(휴지통으로 간 페이지)는 다시 보내도 같은 결과다.
         if (!(isAppError(error) && error.kind === "NotFound")) this.schedule(RETRY_MS);
       } finally {
+        this.sending = null;
         this.inflight = null;
       }
     })();
@@ -129,7 +134,7 @@ export class Autosaver {
     this.saver(id).setTitle(title);
   }
 
-  /** 아직 저장하지 못한 본문(실패 중 다른 페이지에 갔다 돌아오면 DB 본문보다 새것이다). */
+  /** 아직 저장하지 못한 본문(보내는 중인 것 포함). 실패 중 다른 화면에 갔다 돌아오면 DB 본문보다 새것이다. */
   pendingContent(id: PageId): JSONContent | null {
     return this.savers.get(id)?.pendingContent ?? null;
   }

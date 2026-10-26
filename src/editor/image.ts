@@ -88,6 +88,9 @@ export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 const EXTENSIONS: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
+/** 저장할 파일 확장자(save_attachment의 x-ext). IMAGE_TYPES가 아니면 "bin"이라 Rust가 UnsupportedType으로 거절한다. */
+export const imageExt = (type: string) => EXTENSIONS[type] ?? "bin";
+
 /**
  * `data:` 주소를 파일로 바꾼다. 네트워크 요청 없이 문자열만 푼다(fetch는 CSP connect-src에 막힌다).
  * 형식은 거르지 않는다. 허용 밖 형식도 파일로 돌려주어 넣는 쪽이 이유를 알리게 한다. 주소가 깨졌으면 null.
@@ -105,7 +108,7 @@ export function dataUrlToFile(url: string): File | null {
     } else {
       bytes = new TextEncoder().encode(decodeURIComponent(match[3]));
     }
-    return new File([bytes], `붙여넣은 이미지.${EXTENSIONS[type] ?? "bin"}`, { type });
+    return new File([bytes], `붙여넣은 이미지.${imageExt(type)}`, { type });
   } catch {
     return null;
   }
