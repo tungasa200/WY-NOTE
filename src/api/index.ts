@@ -78,13 +78,17 @@ export const api: Backend = new Proxy({} as Backend, {
 /** 계약-AI 4.1: AI 화면의 기본 실패 문구. */
 export const AI_FAIL = "AI 요청이 실패했습니다";
 
+/**
+ * AppError인가. 종류 판정은 문자열 kind 하나만 본다(message가 빠진 거부도 종류는 알아본다).
+ * message는 개발자용이라 화면에 쓰지 않으므로 있다고 믿지 않는다.
+ */
 export function isAppError(e: unknown): e is AppError {
-  return typeof e === "object" && e !== null && "kind" in e && "message" in e;
+  return typeof e === "object" && e !== null && typeof (e as { kind?: unknown }).kind === "string";
 }
 
-/** AppError의 kind. kind가 없으면 null(message가 빠진 거부도 종류는 알아본다). */
+/** AppError의 kind. 아니면 null. */
 export function errorKind(e: unknown): AppError["kind"] | null {
-  return typeof e === "object" && e !== null && "kind" in e ? (e as AppError).kind : null;
+  return isAppError(e) ? e.kind : null;
 }
 
 /**
@@ -92,8 +96,7 @@ export function errorKind(e: unknown): AppError["kind"] | null {
  * AppError가 아니거나 모르는 kind면 fallback(AI 화면은 AI_FAIL을 넘긴다).
  */
 export function errorReason(e: unknown, fallback = "알 수 없는 오류가 났습니다"): string {
-  if (!isAppError(e)) return fallback;
-  switch (e.kind) {
+  switch (errorKind(e)) {
     case "NoApiKey":
       return "API 키가 없습니다";
     case "Keyring":

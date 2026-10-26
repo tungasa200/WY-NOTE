@@ -1,5 +1,6 @@
 /* 앱 셸(S-01): 사이드바 / 편집 영역 / AI 패널 3열. 접힌 열은 0px(띠를 남기지 않는다). */
 .shell {
+  position: relative; /* 좁은 창에서 겹쳐 띄우는 AI 패널의 기준 */
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--ai-panel-width);
   height: 100%;
@@ -326,6 +327,48 @@
   min-width: 0;
   background: var(--color-bg-sidebar);
   border-left: 1px solid var(--color-border);
+}
+
+/*
+ * 좁은 창(S-01): 1100px 미만에서 AI 패널이 열려 있으면 편집 여백을 40px로 줄인다.
+ * 그래도 본문(.page 안쪽 = 창 - 사이드바 248 - AI 340 - 여백 2×40 - 스크롤바 약 10)이 480px 밑이면 AI 패널을 편집 영역 위에 겹친다.
+ * 사이드바를 펴면 1100px 미만에서 늘 480 밑(창 < 1158)이고, 접으면 창 920px 미만에서 480 밑이다.
+ * 사이드바·AI 너비를 끌어 바꾸게 되면 이 계산을 다시 해야 한다.
+ */
+@media (max-width: 1099.98px) {
+  .shell[data-ai="open"] {
+    --editor-gutter: 40px;
+  }
+
+  .shell[data-ai="open"][data-sidebar="open"] {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
+  }
+
+  .shell[data-ai="open"][data-sidebar="open"] > .ai-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--ai-panel-width);
+    z-index: var(--z-drag); /* 편집기 위, 메뉴·대화상자 아래 */
+    box-shadow: var(--shadow-dialog);
+  }
+}
+
+@media (max-width: 919.98px) {
+  .shell[data-ai="open"][data-sidebar="closed"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+
+  .shell[data-ai="open"][data-sidebar="closed"] > .ai-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--ai-panel-width);
+    z-index: var(--z-drag);
+    box-shadow: var(--shadow-dialog);
+  }
 }
 
 /* ── 알림 ── */

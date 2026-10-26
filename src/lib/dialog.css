@@ -43,3 +43,8 @@
   opacity: 0.7;
   cursor: progress;
 }
+
+/* 위험하지만 주 버튼이 아닌 동작(S-12 "그래도 닫기"): 빨강 글자. */
+.dialog .dialog-danger-text {
+  color: var(--color-danger);
+}
