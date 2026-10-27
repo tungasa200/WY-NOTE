@@ -116,7 +116,7 @@ export function createMockBackend(): Backend {
         const row: Row = {
           id: db.nextId++,
           parentId,
-          position: siblings(parentId).length,
+          position: -1,
           title: "",
           content: EMPTY_DOC,
           expanded: false,
@@ -126,6 +126,8 @@ export function createMockBackend(): Backend {
           trashRootId: null,
         };
         db.rows.push(row);
+        // 새 페이지는 부모의 맨 앞(P5-3). 기존 형제는 한 칸씩 밀린다.
+        renumber(siblings(parentId));
         return toPage(row);
       }),
     renamePage: (id, title) =>

@@ -162,18 +162,15 @@ pub fn create_page(conn: &mut Connection, parent_id: Option<i64>) -> AppResult<P
     if let Some(p) = parent_id {
         ensure_alive(&tx, p)?;
     }
-    let pos: i64 = tx.query_row(
-        "SELECT count(*) FROM pages WHERE parent_id IS ?1 AND trashed_at IS NULL",
-        [parent_id],
-        |r| r.get(0),
-    )?;
     let now = now_ms();
     tx.execute(
         "INSERT INTO pages (parent_id, position, title, content, created_at, updated_at)
-         VALUES (?1, ?2, '', ?3, ?4, ?4)",
-        params![parent_id, pos, EMPTY_DOC, now],
+         VALUES (?1, 0, '', ?2, ?3, ?3)",
+        params![parent_id, EMPTY_DOC, now],
     )?;
     let id = tx.last_insert_rowid();
+    // 새 페이지는 부모의 맨 앞(P5-3). 기존 형제는 한 칸씩 밀린다.
+    insert_at(&tx, parent_id, id, 0)?;
     tx.execute("INSERT INTO page_fts (rowid, title, body) VALUES (?1, '', '')", [id])?;
     if let Some(p) = parent_id {
         tx.execute("UPDATE pages SET expanded = 1 WHERE id = ?1", [p])?;
@@ -479,13 +476,15 @@ mod tests {
     }
 
     #[test]
-    fn create_appends_and_expands_parent() {
+    fn create_prepends_and_expands_parent() {
         let mut c = open_memory();
         let a = new(&mut c, None);
         let b = new(&mut c, None);
         let a1 = new(&mut c, Some(a));
-        assert_eq!(kids(&c, None), vec![a, b]);
-        assert_eq!(kids(&c, Some(a)), vec![a1]);
+        let a2 = new(&mut c, Some(a));
+        assert_eq!(kids(&c, None), vec![b, a]);
+        assert_eq!(kids(&c, Some(a)), vec![a2, a1]);
+        positions_dense(&c);
         let page = get_page(&c, a1).unwrap();
         assert_eq!(page.title, "");
         assert_eq!(page.content, serde_json::from_str::<Value>(EMPTY_DOC).unwrap());
@@ -516,9 +515,10 @@ mod tests {
     #[test]
     fn move_renumbers_old_and_new_siblings() {
         let mut c = open_memory();
-        let a = new(&mut c, None);
-        let b = new(&mut c, None);
+        // 새 페이지는 맨 앞에 생기므로 거꾸로 만들어 [a, b, x]로 둔다.
         let x = new(&mut c, None);
+        let b = new(&mut c, None);
+        let a = new(&mut c, None);
         let b1 = new(&mut c, Some(b));
         // 같은 부모 안 순서 바꾸기
         move_page(&mut c, x, None, 0).unwrap();
@@ -536,9 +536,9 @@ mod tests {
     fn trash_bundle_and_restore_to_original_place() {
         let mut c = open_memory();
         let a = new(&mut c, None);
-        let s1 = new(&mut c, Some(a));
-        let b = new(&mut c, Some(a));
         let s2 = new(&mut c, Some(a));
+        let b = new(&mut c, Some(a));
+        let s1 = new(&mut c, Some(a));
         let b1 = new(&mut c, Some(b));
         let _b2 = new(&mut c, Some(b1));
 
@@ -651,8 +651,8 @@ mod tests {
     fn start_page_falls_back_to_first_root() {
         let mut c = open_memory();
         assert_eq!(get_start_page_id(&c).unwrap(), None);
-        let a = new(&mut c, None);
         let b = new(&mut c, None);
+        let a = new(&mut c, None);
         assert_eq!(get_start_page_id(&c).unwrap(), Some(a));
         set_last_page(&c, b).unwrap();
         assert_eq!(get_start_page_id(&c).unwrap(), Some(b));
