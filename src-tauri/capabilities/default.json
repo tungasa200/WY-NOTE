@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
+    "core:window:allow-show",
     {
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$APPDATA" }]

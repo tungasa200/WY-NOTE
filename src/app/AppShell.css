@@ -285,9 +285,17 @@
   field-sizing: content; /* 내용만큼 높이가 늘어난다(WebView2·Chromium 123+) */
 }
 
-/* 큰 제목 칸은 커서로 위치가 보인다. 테두리 상자는 문서 모양을 깨므로 그리지 않는다. */
+/* 테두리 상자는 문서 모양을 깨므로 그리지 않고, 제목 아래에 포커스 색 밑줄만 긋는다. */
 .page-title:focus-visible {
   outline: none;
+  box-shadow: 0 var(--focus-ring-width) 0 var(--color-focus-ring);
+}
+
+/* 고대비 모드는 그림자를 지우므로 테두리로 대신한다. */
+@media (forced-colors: active) {
+  .page-title:focus-visible {
+    outline: var(--focus-ring-width) solid Highlight;
+  }
 }
 
 .page-title::placeholder {

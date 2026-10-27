@@ -8,6 +8,7 @@ mod window_fit;
 
 use tauri::webview::NewWindowResponse;
 use tauri::{Manager, RunEvent, Url, WebviewWindowBuilder};
+use tauri_plugin_window_state::StateFlags;
 
 /// 앱 자체 주소와 wyasset만 허용한다(NF-06). 그 밖의 탐색·새 창은 막는다.
 fn is_app_url(url: &Url, dev_url: Option<&Url>) -> bool {
@@ -42,7 +43,12 @@ pub fn run() {
         }))
         // 저장된 창 상태를 최소 크기·화면 안으로 고친다. window-state가 파일을 읽기 전이어야 한다(P4-3).
         .plugin(window_fit::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // 보이기는 저장·복원하지 않는다. 창은 숨긴 채 만들고 화면이 테마를 입힌 뒤 보인다(F-09, 흰 번쩍임 막기).
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::all() - StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -68,10 +74,18 @@ pub fn run() {
             // 창은 tauri.conf.json에서 create=false로 두고 여기서 만든다(탐색 차단을 걸기 위해).
             let config = app.config().app.windows.first().ok_or("창 설정이 없습니다")?.clone();
             let dev_url = app.config().build.dev_url.clone();
-            WebviewWindowBuilder::from_config(app.handle(), &config)?
+            // 창은 visible=false로 만들고 화면(App.tsx)이 첫 그리기 뒤 show()를 부른다.
+            let window = WebviewWindowBuilder::from_config(app.handle(), &config)?
                 .on_navigation(move |url| is_app_url(url, dev_url.as_ref()))
                 .on_new_window(|_, _| NewWindowResponse::Deny)
                 .build()?;
+            // 화면이 show()를 못 부르면(스크립트 오류 등) 창이 영영 안 보이므로 늦게라도 보인다.
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if !window.is_visible().unwrap_or(true) {
+                    let _ = window.show();
+                }
+            });
             Ok(())
         })
         // 파일 읽기가 화면 스레드를 막지 않게 비동기 프로토콜로 받아 작업 스레드에서 읽는다.
