@@ -169,6 +169,21 @@ function SlashMenu({ items, command, editor, ref }: SlashMenuProps) {
 
 const slashMenuKey = new PluginKey("slashMenu");
 
+/** 블록 손잡이 '+'가 넣은 `/`의 위치. 메뉴를 고르지 않고 닫으면 그 `/`를 지운다. */
+const buttonSlash = new WeakMap<Editor, number>();
+
+/** `at` 위치에 `/`만 든 새 문단을 넣어 / 메뉴를 연다(블록 손잡이 '+'). */
+export function insertSlashBlock(editor: Editor, at: number) {
+  buttonSlash.set(editor, at + 1);
+  editor
+    .chain()
+    .insertContentAt(at, { type: "paragraph", content: [{ type: "text", text: "/" }] })
+    .setTextSelection(at + 2)
+    .focus()
+    .run();
+  buttonSlash.delete(editor);
+}
+
 /** 빈 줄 맨 앞에서 `/`로 여는 블록 종류 메뉴(F-02, S-06b). */
 export const SlashCommand = Extension.create<SlashOptions>({
   name: "slashCommand",
@@ -177,6 +192,8 @@ export const SlashCommand = Extension.create<SlashOptions>({
   },
   addProseMirrorPlugins() {
     const options = this.options;
+    let fromButton = false;
+    let picked = false;
     return [
       Suggestion<SlashItem, SlashItem>({
         pluginKey: slashMenuKey,
@@ -186,13 +203,18 @@ export const SlashCommand = Extension.create<SlashOptions>({
         // 문단에서만 연다. 코드 블록 안의 `/`는 그냥 글자다.
         allow: ({ state, range }) => state.doc.resolve(range.from).parent.type.name === "paragraph",
         items: ({ query, editor }) => buildItems(options, editor).filter((item) => matches(item, query)),
-        command: ({ editor, range, props }) => props.run(editor, range),
+        command: ({ editor, range, props }) => {
+          picked = true;
+          props.run(editor, range);
+        },
         render: () => {
           let renderer: ReactRenderer<SlashMenuHandle, SlashMenuProps> | null = null;
           let unmount: (() => void) | null = null;
           let emptyQuery: string | null = null;
           return {
             onStart: (props) => {
+              fromButton = buttonSlash.get(props.editor) === props.range.from;
+              picked = false;
               renderer = new ReactRenderer(SlashMenu, { props, editor: props.editor });
               unmount = props.mount(renderer.element as HTMLElement);
             },
@@ -206,7 +228,22 @@ export const SlashCommand = Extension.create<SlashOptions>({
               renderer?.updateProps(props);
             },
             onKeyDown: ({ event }) => renderer?.ref?.onKeyDown(event) ?? false,
-            onExit: () => {
+            onExit: ({ editor, range }) => {
+              // '+'로 연 메뉴를 고르지 않고 닫으면(Esc·바깥 클릭) 그 `/`를 지운다.
+              // 그 뒤 글자를 더 쳤으면 사용자 글이므로 둔다. 직접 친 `/`는 그대로 둔다(S-06b).
+              if (fromButton && !picked) {
+                const from = range.from;
+                queueMicrotask(() => {
+                  if (editor.isDestroyed) return;
+                  const { doc } = editor.state;
+                  if (from >= doc.content.size) return;
+                  const $from = doc.resolve(from);
+                  if ($from.parent.type.name !== "paragraph" || $from.parent.textContent !== "/" || $from.parentOffset !== 0) return;
+                  editor.view.dispatch(editor.state.tr.delete(from, from + 1).setMeta("addToHistory", false));
+                });
+              }
+              fromButton = false;
+              picked = false;
               unmount?.();
               renderer?.destroy();
               renderer = null;

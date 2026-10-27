@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState, type DragEvent, type RefObject } 
 import type { Editor } from "@tiptap/react";
 import { NodeSelection } from "@tiptap/pm/state";
 import { Icon } from "./icons";
+import { insertSlashBlock } from "./slashMenu";
 
 /** 손잡이를 블록 본문 왼쪽 바깥으로 얼마나 띄우는가(S-06). */
 const OFFSET = 52;
@@ -120,13 +121,8 @@ export function BlockHandle({ editor, wrapRef }: { editor: Editor; wrapRef: RefO
     const node = editor.state.doc.nodeAt(pos);
     if (!node) return;
     const after = pos + node.nodeSize;
-    // `/`를 넣으면 / 메뉴가 열린다. 메뉴를 닫으면 `/` 글자는 남는다(S-06b와 같은 동작).
-    editor
-      .chain()
-      .insertContentAt(after, { type: "paragraph", content: [{ type: "text", text: "/" }] })
-      .setTextSelection(after + 2)
-      .focus()
-      .run();
+    // `/`를 넣어 / 메뉴를 연다. 고르지 않고 닫으면 그 `/`는 지운다(P5-1).
+    insertSlashBlock(editor, after);
   };
 
   const onDragStart = (e: DragEvent) => {
