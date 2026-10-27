@@ -1,5 +1,6 @@
 // AI 패널(화면설계 S-07, F-08.1~F-08.3·F-08.5). 앱 셸의 오른쪽 자리(aside) 안을 채운다.
 // 결과는 사용자가 "바꾸기"·"삽입"을 누르기 전에는 노트에 들어가지 않는다. 요청 중에도 편집은 막지 않는다.
+import { X } from "lucide-react";
 import { memo, useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AI_FAIL, errorKind, errorReason } from "../api";
 import { aiApi } from "../api/ai";
@@ -323,7 +324,7 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
         )}
         {!online && <span className="ai-badge ai-badge-offline">오프라인</span>}
         <button type="button" className="icon-button ai-close" aria-label="AI 패널 닫기" aria-keyshortcuts="Control+J" title="AI 패널 닫기 (Ctrl+J)" onClick={onClose}>
-          ✕
+          <X size={16} strokeWidth={1.6} aria-hidden="true" focusable="false" />
         </button>
       </div>
 
