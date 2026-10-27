@@ -159,6 +159,11 @@
   color: var(--color-text-tertiary);
 }
 
+/* 선택 바탕 위에서는 3단계 글자가 4.5:1에 못 미친다(라이트 프리셋) → 2단계로 올린다. */
+.search-result[aria-selected="true"] :is(.search-result-title.is-untitled, .search-result-path) {
+  color: var(--color-text-secondary);
+}
+
 .search-result-snippet {
   display: -webkit-box;
   margin-top: var(--space-0-5);

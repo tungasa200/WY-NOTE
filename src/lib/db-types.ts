@@ -66,8 +66,12 @@ export type TrashItem = {
 };
 
 /** 화면 상태(F-07 확장). Rust는 내용을 해석하지 않고 그대로 저장한다. 빠진 키는 기본값. */
+export type Theme = "system" | "light" | "dark";
+export type Accent = "teal" | "navy" | "plum" | "rust" | "gray";
+
 export type UiState = {
-  theme?: "system" | "light" | "dark";
+  theme?: Theme;
+  accent?: Accent; // 강조색 프리셋(P5-2). 빠졌거나 모르는 값이면 teal
   sidebarWidth?: number; // 200~360
   sidebarCollapsed?: boolean;
   aiPanelOpen?: boolean;

@@ -1,0 +1,174 @@
+/*
+ * 강조색 프리셋(화면설계 v0.5 "강조색 프리셋", P5-2). tokens.css 다음에 불러온다.
+ * <html data-accent="navy|plum|rust|gray">(속성 없음 = teal)로 강조 토큰 7개만 덮는다.
+ * 포커스 고리·상태색·코드 강조·검색 강조는 바꾸지 않는다.
+ * [data-swatch]는 설정 화면의 견본: 지금 고른 강조색과 상관없이 그 프리셋 색으로 칠하려고 같은 값을 받는다.
+ * 선택자 무게: 라이트 (0,2,0) < 다크 (0,3,0) — 다크 테마 블록(tokens.css, 0,2,0)도 이긴다.
+ */
+
+/* ── 라이트 ── */
+[data-swatch="teal"] {
+  --color-accent: #24706a;
+  --color-accent-hover: #1c5d58;
+  --color-accent-soft: #e2eeec;
+  --color-bg-selected: #e2eeec;
+  --color-text-on-accent: #ffffff;
+  --color-selection: rgba(36, 112, 106, 0.18);
+  --color-drop-indicator: #24706a;
+}
+
+:root[data-accent="navy"],
+[data-swatch="navy"] {
+  --color-accent: #3a4d96;
+  --color-accent-hover: #2e3e7b;
+  --color-accent-soft: #e5e8f4;
+  --color-bg-selected: #e5e8f4;
+  --color-text-on-accent: #ffffff;
+  --color-selection: rgba(58, 77, 150, 0.18);
+  --color-drop-indicator: #3a4d96;
+}
+
+:root[data-accent="plum"],
+[data-swatch="plum"] {
+  --color-accent: #863a7c;
+  --color-accent-hover: #6f2f66;
+  --color-accent-soft: #f2e5ef;
+  --color-bg-selected: #f2e5ef;
+  --color-text-on-accent: #ffffff;
+  --color-selection: rgba(134, 58, 124, 0.18);
+  --color-drop-indicator: #863a7c;
+}
+
+:root[data-accent="rust"],
+[data-swatch="rust"] {
+  --color-accent: #9c4a1c;
+  --color-accent-hover: #813d16;
+  --color-accent-soft: #f5e7dc;
+  --color-bg-selected: #f5e7dc;
+  --color-text-on-accent: #ffffff;
+  --color-selection: rgba(156, 74, 28, 0.18);
+  --color-drop-indicator: #9c4a1c;
+}
+
+:root[data-accent="gray"],
+[data-swatch="gray"] {
+  --color-accent: #52504b;
+  --color-accent-hover: #3f3e3a;
+  --color-accent-soft: #e8e7e2;
+  --color-bg-selected: #e8e7e2;
+  --color-text-on-accent: #ffffff;
+  --color-selection: rgba(82, 80, 75, 0.18);
+  --color-drop-indicator: #52504b;
+}
+
+/* ── 다크: Windows 설정이 다크이고 라이트를 고르지 않았을 때 ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-swatch="teal"] {
+    --color-accent: #6fc0b6;
+    --color-accent-hover: #8dd0c7;
+    --color-accent-soft: #203936;
+    --color-bg-selected: #203936;
+    --color-text-on-accent: #10201e;
+    --color-selection: rgba(111, 192, 182, 0.26);
+    --color-drop-indicator: #6fc0b6;
+  }
+
+  :root:not([data-theme="light"])[data-accent="navy"],
+  :root:not([data-theme="light"]) [data-swatch="navy"] {
+    --color-accent: #9badeb;
+    --color-accent-hover: #b6c3f1;
+    --color-accent-soft: #252b42;
+    --color-bg-selected: #252b42;
+    --color-text-on-accent: #121a33;
+    --color-selection: rgba(155, 173, 235, 0.26);
+    --color-drop-indicator: #9badeb;
+  }
+
+  :root:not([data-theme="light"])[data-accent="plum"],
+  :root:not([data-theme="light"]) [data-swatch="plum"] {
+    --color-accent: #dc9dcf;
+    --color-accent-hover: #e8b8de;
+    --color-accent-soft: #3a2436;
+    --color-bg-selected: #3a2436;
+    --color-text-on-accent: #2a1226;
+    --color-selection: rgba(220, 157, 207, 0.26);
+    --color-drop-indicator: #dc9dcf;
+  }
+
+  :root:not([data-theme="light"])[data-accent="rust"],
+  :root:not([data-theme="light"]) [data-swatch="rust"] {
+    --color-accent: #e39e70;
+    --color-accent-hover: #ecb58f;
+    --color-accent-soft: #3b2b21;
+    --color-bg-selected: #3b2b21;
+    --color-text-on-accent: #2a160b;
+    --color-selection: rgba(227, 158, 112, 0.26);
+    --color-drop-indicator: #e39e70;
+  }
+
+  :root:not([data-theme="light"])[data-accent="gray"],
+  :root:not([data-theme="light"]) [data-swatch="gray"] {
+    --color-accent: #c6c3bc;
+    --color-accent-hover: #d8d5cf;
+    --color-accent-soft: #353431;
+    --color-bg-selected: #353431;
+    --color-text-on-accent: #1c1c1a;
+    --color-selection: rgba(198, 195, 188, 0.26);
+    --color-drop-indicator: #c6c3bc;
+  }
+}
+
+/* ── 다크: 다크를 고른 때 ── */
+:root[data-theme="dark"] [data-swatch="teal"] {
+  --color-accent: #6fc0b6;
+  --color-accent-hover: #8dd0c7;
+  --color-accent-soft: #203936;
+  --color-bg-selected: #203936;
+  --color-text-on-accent: #10201e;
+  --color-selection: rgba(111, 192, 182, 0.26);
+  --color-drop-indicator: #6fc0b6;
+}
+
+:root[data-theme="dark"][data-accent="navy"],
+:root[data-theme="dark"] [data-swatch="navy"] {
+  --color-accent: #9badeb;
+  --color-accent-hover: #b6c3f1;
+  --color-accent-soft: #252b42;
+  --color-bg-selected: #252b42;
+  --color-text-on-accent: #121a33;
+  --color-selection: rgba(155, 173, 235, 0.26);
+  --color-drop-indicator: #9badeb;
+}
+
+:root[data-theme="dark"][data-accent="plum"],
+:root[data-theme="dark"] [data-swatch="plum"] {
+  --color-accent: #dc9dcf;
+  --color-accent-hover: #e8b8de;
+  --color-accent-soft: #3a2436;
+  --color-bg-selected: #3a2436;
+  --color-text-on-accent: #2a1226;
+  --color-selection: rgba(220, 157, 207, 0.26);
+  --color-drop-indicator: #dc9dcf;
+}
+
+:root[data-theme="dark"][data-accent="rust"],
+:root[data-theme="dark"] [data-swatch="rust"] {
+  --color-accent: #e39e70;
+  --color-accent-hover: #ecb58f;
+  --color-accent-soft: #3b2b21;
+  --color-bg-selected: #3b2b21;
+  --color-text-on-accent: #2a160b;
+  --color-selection: rgba(227, 158, 112, 0.26);
+  --color-drop-indicator: #e39e70;
+}
+
+:root[data-theme="dark"][data-accent="gray"],
+:root[data-theme="dark"] [data-swatch="gray"] {
+  --color-accent: #c6c3bc;
+  --color-accent-hover: #d8d5cf;
+  --color-accent-soft: #353431;
+  --color-bg-selected: #353431;
+  --color-text-on-accent: #1c1c1a;
+  --color-selection: rgba(198, 195, 188, 0.26);
+  --color-drop-indicator: #c6c3bc;
+}
