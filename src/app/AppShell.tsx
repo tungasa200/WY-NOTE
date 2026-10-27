@@ -1,6 +1,7 @@
 // 앱 셸(화면설계 S-01): 사이드바 · 편집 영역 · AI 패널 자리. 트리(S-02), 빈 상태(S-09), 저장 실패(S-10)를 묶는다.
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { PanelLeft, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errorReason } from "../api";
 import { AiPanel } from "../ai/AiPanel";
@@ -443,7 +444,7 @@ export function AppShell() {
               title="사이드바 접기 (Ctrl+\)"
               onClick={() => updateLayout((l) => ({ ...l, sidebar: false }))}
             >
-              ◧
+              <PanelLeft size={16} strokeWidth={1.6} aria-hidden="true" focusable="false" />
             </button>
           </div>
           <button
@@ -466,7 +467,8 @@ export function AppShell() {
             title="새 페이지 (Ctrl+N)"
             onClick={() => void createPage(null)}
           >
-            + 새 페이지
+            <Plus size={16} strokeWidth={1.6} aria-hidden="true" focusable="false" />
+            새 페이지
           </button>
           <div className="sidebar-label" id="tree-label">
             페이지
@@ -520,7 +522,7 @@ export function AppShell() {
               title="사이드바 펴기 (Ctrl+\)"
               onClick={() => updateLayout((l) => ({ ...l, sidebar: true }))}
             >
-              ◧
+              <PanelLeft size={16} strokeWidth={1.6} aria-hidden="true" focusable="false" />
             </button>
           )}
           {view === "page" && openNode && (

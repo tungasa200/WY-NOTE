@@ -1,4 +1,5 @@
 // 페이지 트리(F-01~F-01.4, 화면설계 S-02). 평평한 treeitem 목록 + aria-level 방식.
+import { ChevronRight, Ellipsis, Plus } from "lucide-react";
 import {
   useEffect,
   useImperativeHandle,
@@ -232,7 +233,7 @@ export function PageTree({ ref, ix, selectedId, onOpen, onCreate, onRename, onTo
                   onToggle(node.id, !node.expanded);
                 }}
               >
-                {hasChildren ? "▸" : ""}
+                {hasChildren && <ChevronRight size={12} strokeWidth={1.6} focusable="false" />}
               </span>
               {renamingId === node.id ? (
                 <RenameInput
@@ -260,7 +261,7 @@ export function PageTree({ ref, ix, selectedId, onOpen, onCreate, onRename, onTo
                     setMenu({ id: node.id, x: r.left, y: r.bottom });
                   }}
                 >
-                  ⋯
+                  <Ellipsis size={14} strokeWidth={1.6} focusable="false" />
                 </button>
                 <button
                   type="button"
@@ -271,7 +272,7 @@ export function PageTree({ ref, ix, selectedId, onOpen, onCreate, onRename, onTo
                     onCreate(node.id);
                   }}
                 >
-                  +
+                  <Plus size={14} strokeWidth={1.6} focusable="false" />
                 </button>
               </span>
             </div>
