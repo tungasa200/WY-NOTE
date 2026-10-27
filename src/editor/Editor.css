@@ -94,6 +94,11 @@
   overflow-wrap: anywhere;
 }
 
+/* 글 쓰는 동안 편집 영역 전체에 포커스 테두리를 두르지 않는다(P5-1). 전역 :focus-visible보다 앞서게 선택자를 높인다. */
+.editor-body:focus-visible {
+  outline: none;
+}
+
 .editor-body pre {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);

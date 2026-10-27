@@ -329,6 +329,8 @@
 .ai-panel {
   grid-column: 3;
   min-width: 0;
+  min-height: 0; /* 긴 대화가 격자 행을 늘리지 않게 한다. 스크롤은 안쪽 .ai-log만(P5-1) */
+  overflow: hidden;
   background: var(--color-bg-sidebar);
   border-left: 1px solid var(--color-border);
 }
