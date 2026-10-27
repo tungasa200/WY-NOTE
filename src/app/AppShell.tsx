@@ -15,6 +15,7 @@ import { displayTitle, quoteObject } from "../lib/title";
 import { PageTree, type PageTreeHandle } from "../tree/PageTree";
 import { ancestors, descendantIds, indexTree } from "../tree/tree";
 import { Autosaver, type SaveStatus } from "./autosave";
+import { applyAppearance, cacheAppearance, cachedAppearance, readAppearance, type Appearance } from "./appearance";
 import { CloseSaveDialog } from "./CloseSaveDialog";
 import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
@@ -74,6 +75,15 @@ export function AppShell() {
     setLayout(f);
   };
   const [recent, setRecent] = useState<PageId[]>([]);
+  // 테마·강조색(S-08). 처음에는 theme-init.js가 넣은 사본을 쓰고, 저장값을 읽으면 그것으로 맞춘다.
+  const [appearance, setAppearanceState] = useState<Appearance>(cachedAppearance);
+  const appearanceTouched = useRef(false);
+  const setAppearance = (a: Appearance) => {
+    appearanceTouched.current = true;
+    setAppearanceState(a);
+  };
+  // 테마·강조색이 저장될 때마다 1씩 는다(설정 화면의 '저장됨' 표시).
+  const [appearanceSaves, setAppearanceSaves] = useState(0);
   // 저장한 화면 상태(마지막으로 보낸 값). 읽기 전·읽지 못했으면(null) 쓰지 않는다(기본값으로 덮지 않게).
   // 이 화면이 다루지 않는 키(테마·너비)도 그대로 돌려 쓴다.
   const uiSaved = useRef<UiState | null>(null);
@@ -184,6 +194,9 @@ export function AppShell() {
         const ui: UiState = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : {};
         const saved = readUiState(ui);
         if (!layoutTouched.current) setLayout(saved.layout);
+        const stored = readAppearance(ui);
+        cacheAppearance(stored);
+        if (!appearanceTouched.current) setAppearanceState(stored);
         // 그새 연 페이지가 앞에 온다.
         setRecent((r) => [...r, ...saved.recent.filter((id) => !r.includes(id))].slice(0, RECENT_MAX));
         uiSaved.current = ui;
@@ -244,16 +257,28 @@ export function AppShell() {
     else setClosePrompt(prompt);
   };
 
+  useEffect(() => applyAppearance(appearance), [appearance]);
+
   useEffect(() => {
     if (!uiLoaded || !uiSaved.current) return;
-    const next = { ...uiSaved.current, sidebarCollapsed: !layout.sidebar, aiPanelOpen: layout.ai, recentPageIds: recent };
-    if (JSON.stringify(next) === JSON.stringify(uiSaved.current)) return; // 바뀐 게 없으면 보내지 않는다
+    const prev = uiSaved.current;
+    const next: UiState = { ...prev, sidebarCollapsed: !layout.sidebar, aiPanelOpen: layout.ai, recentPageIds: recent };
+    // 사용자가 고른 뒤에만 쓴다(저장한 적 없는 기본값을 새로 적지 않는다).
+    if (appearanceTouched.current) Object.assign(next, appearance);
+    if (JSON.stringify(next) === JSON.stringify(prev)) return; // 바뀐 게 없으면 보내지 않는다
+    const appearanceChanged = next.theme !== prev.theme || next.accent !== prev.accent;
     // 성공한 뒤에만 기억한다(실패하면 다음 변경 때 다시 보낸다).
     api.setUiState(next).then(
-      () => (uiSaved.current = next),
+      () => {
+        uiSaved.current = next;
+        if (appearanceChanged) {
+          cacheAppearance(appearance);
+          setAppearanceSaves((n) => n + 1);
+        }
+      },
       () => {},
     );
-  }, [uiLoaded, layout, recent]);
+  }, [uiLoaded, layout, recent, appearance]);
 
   const createPage = useCallback(
     async (parentId: PageId | null) => {
@@ -587,7 +612,7 @@ export function AppShell() {
               </button>
             </div>
           ) : view === "settings" ? (
-            <SettingsView />
+            <SettingsView appearance={appearance} onAppearance={setAppearance} appearanceSaves={appearanceSaves} />
           ) : view === "trash" ? (
             <TrashPanel
               key={trashVersion}
