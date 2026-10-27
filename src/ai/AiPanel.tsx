@@ -167,10 +167,12 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
     rerender();
   };
 
+  // 답이 끝나면 삽입·복사 버튼이 생겨 높이가 늘어난다. state가 바뀔 때도 다시 내린다.
+  // 질문 탭으로 돌아오거나 페이지를 바꾸면 기록 칸이 새로 그려지므로 그때도 맨 아래로.
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, messages[messages.length - 1]?.answer]);
+  }, [tab, pageId, messages.length, messages[messages.length - 1]?.answer, messages[messages.length - 1]?.state]);
 
   // 상태 알림(S-07, 한 번에 하나, 우선순위 순).
   const blocked: "loading" | "nopage" | "nokey" | "excluded" | "offline" | "limit" | null =
@@ -457,7 +459,7 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
 
         {tab === "ask" && (
           <div className="ai-ask">
-            <p className="ai-target">{askTarget ? askTarget.label : target ? `대상: 이 페이지 전체 · ${fmt(docLen)}자` : ""}</p>
+            <p className="ai-target">{askTarget ? askTarget.label : target ? `대상: 이 페이지 전체 · ${fmt(docLen)}자 (20,000자 넘음)` : ""}</p>
             {blocked === null && overDoc && !sel && (
               <p className="ai-notice ai-notice-neutral" role="status">
                 이 노트는 20,000자를 넘어 전체를 보낼 수 없습니다. 질문할 부분을 본문에서 선택하세요. 자동으로 잘라 보내지 않습니다.
