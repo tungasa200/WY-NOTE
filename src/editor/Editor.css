@@ -123,10 +123,25 @@
   gap: var(--space-2);
 }
 
+.editor-body ul[data-type="taskList"] li + li {
+  margin-top: 1em;
+}
+
+/* 체크박스를 글 첫 줄 높이(1lh)의 가운데에 둔다. 문단 위 여백은 li 사이 간격으로 옮긴다(P5-1). */
 .editor-body ul[data-type="taskList"] li > label {
   position: relative;
   flex: none;
-  margin-top: var(--space-0-5);
+  display: flex;
+  align-items: center;
+  height: 1lh;
+}
+
+.editor-body ul[data-type="taskList"] li > div > :first-child {
+  margin-top: 0;
+}
+
+.editor-body ul[data-type="taskList"] li > div > :last-child {
+  margin-bottom: 0;
 }
 
 /* 체크박스는 16px이지만 누르는 영역은 24px로 넓힌다(S-06). */
