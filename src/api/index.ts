@@ -134,7 +134,7 @@ export function errorReason(e: unknown, fallback = "알 수 없는 오류가 났
     case "Db":
       return "데이터베이스에 쓰지 못했습니다(디스크 공간을 확인하세요)";
     case "DbBusy":
-      return "다른 프로그램이 데이터 파일을 쓰는 중이라 저장하지 못했습니다(백업·동기화 프로그램을 확인하세요)";
+      return "다른 프로그램이 데이터 파일을 쓰는 중입니다(백업·동기화 프로그램을 확인하세요)";
     case "Io":
       return "파일을 읽거나 쓰지 못했습니다";
     case "Migration":
