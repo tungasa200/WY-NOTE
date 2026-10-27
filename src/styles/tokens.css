@@ -40,7 +40,7 @@
   --color-accent: #24706a;           /* 주 버튼·링크·포커스·선택 표시에만 */
   --color-accent-hover: #1c5d58;
   --color-accent-soft: #e2eeec;
-  --color-focus-ring: #24706a;
+  --color-focus-ring: #0284c7;       /* 하늘색. 바탕들과 대비 3.45:1 이상(P5-1) */
   --color-selection: rgba(36, 112, 106, 0.18); /* 글자 선택 */
   --color-drop-indicator: #24706a;   /* 트리·블록 끌기 위치선 */
 
@@ -170,7 +170,7 @@
     --color-accent: #6fc0b6;
     --color-accent-hover: #8dd0c7;
     --color-accent-soft: #203936;
-    --color-focus-ring: #6fc0b6;
+    --color-focus-ring: #38bdf8;
     --color-selection: rgba(111, 192, 182, 0.26);
     --color-drop-indicator: #6fc0b6;
     --color-danger: #f08a80;
@@ -217,7 +217,7 @@
   --color-accent: #6fc0b6;
   --color-accent-hover: #8dd0c7;
   --color-accent-soft: #203936;
-  --color-focus-ring: #6fc0b6;
+  --color-focus-ring: #38bdf8;
   --color-selection: rgba(111, 192, 182, 0.26);
   --color-drop-indicator: #6fc0b6;
   --color-danger: #f08a80;
