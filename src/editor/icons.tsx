@@ -1,4 +1,4 @@
-import { Code, GripVertical, Image, Link, List, ListOrdered, Plus, SquareCheck, Table, Type } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Code, GripVertical, Image, Link, List, ListOrdered, Plus, SquareCheck, Table, Type } from "lucide-react";
 
 // 아이콘은 lucide-react(사용자 결정). 쓰는 것만 import해 번들에 그것만 들어간다.
 const ICONS = {
@@ -12,6 +12,10 @@ const ICONS = {
   plus: Plus,
   grip: GripVertical,
   link: Link,
+  alignLeft: AlignLeft,
+  alignCenter: AlignCenter,
+  alignRight: AlignRight,
+  alignJustify: AlignJustify,
 };
 
 export type IconName = keyof typeof ICONS;
