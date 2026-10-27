@@ -38,6 +38,7 @@
 
 ## 작업 방식
 - 메모리가 작은 PC(RAM 16GB, 세션 여러 개가 함께 돈다). 빌드·`tauri dev`·브라우저 자동화 전에 여유 메모리를 확인한다(PowerShell `(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory`). 500MB 미만이면 시작하지 말고 pm에 알린다. 끝나면 dev 서버·앱·webview 프로세스를 닫는다.
+- 헤드리스 브라우저·CDP 디버그 포트는 비어 있는지 먼저 확인하고, 붙은 대상이 자기가 띄운 것인지 확인한 뒤에만 조작한다. 다른 세션의 QA 앱(WebView2)이 같은 포트를 쓰고 있을 수 있다.
 - 역할 세션은 각자 `.claude/worktrees/<역할>`(가지 `wt/<역할>`)에서 일한다. 본 저장소에서는 `git stash`·`checkout`·`restore`·`reset`·`clean` 금지.
 - 커밋·푸시·병합은 `NOTE-commit`만 한다. 커밋 요청에는 가지·파일 목록·메시지를 적고, 요청한 파일은 완료 회신 전까지 고치지 않는다.
 - 보고는 pm(`NOTE-pm`)에 `[완료]`·`[결정 요청]`·`[차단]`·`[결함]`으로 보낸다. `[완료]`에는 실제로 돌린 검증 명령과 결과를 적는다.
