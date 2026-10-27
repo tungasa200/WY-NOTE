@@ -27,11 +27,3 @@ irm https://raw.githubusercontent.com/tungasa200/WY-NOTE/main/install.ps1 | iex
 npm install
 npm run tauri build
 ```
-
-# Tauri + React + Typescript
-
-This template should help get you started developing with Tauri, React and Typescript in Vite.
-
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
