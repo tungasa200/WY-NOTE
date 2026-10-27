@@ -99,6 +99,11 @@
   color: var(--color-text);
 }
 
+/* 선택 행·끌어 놓기 안쪽 행 바탕 위에서는 3단계 글자가 4.5:1에 못 미친다(라이트 프리셋) → 2단계로 올린다. */
+.tree-row:is([aria-selected="true"], [data-drop="inside"]) :is(.tree-twisty, .tree-title[data-untitled], .tree-actions button:not(:hover)) {
+  color: var(--color-text-secondary);
+}
+
 /* 끌어 옮기기(F-01.4) */
 .tree-row[data-dragging] {
   opacity: 0.45;
