@@ -37,6 +37,10 @@ type SelResult = {
   stale: boolean;
   /** 바꾸기를 이미 했다(그 뒤로는 stale이지만 원문이 바뀐 안내 대신 완료 안내). */
   replaced?: boolean;
+  /** 바꾸기를 Ctrl+Z로 되돌렸다. 삽입은 다시 켜고 바꾸기는 꺼 두며 안내는 띄우지 않는다(pm 결정). */
+  undone?: boolean;
+  /** 바꾼 채로 편집기가 없어졌다(실행 취소 기록도 없음). 되돌리기 안내를 뺀다. */
+  settled?: boolean;
 };
 
 type Msg = {
@@ -56,6 +60,18 @@ type Msg = {
 // 대화는 페이지마다 따로, 앱을 끄면 지워진다(DB에 저장하지 않음, F-08.3). 패널을 닫았다 열어도 남게 모듈에 둔다.
 const conversations = new Map<PageId, Msg[]>();
 let lastTab: Tab = "summarize";
+
+// 요약·다듬기 결과도 패널을 닫았다 열어도 남게 모듈에 둔다(D-36과 같은 원칙, pm 결정). 지금 열린 패널만 다시 그린다.
+// 다듬기의 지켜보기(watch)는 패널을 닫아도 풀지 않는다. 다른 페이지로 가면 편집기가 없어지며 저절로 멈춘다.
+type ResultKey = "summary" | "rewrite";
+const results: Record<ResultKey, SelResult | null> & { page: PageId | null } = { summary: null, rewrite: null, page: null };
+let redraw: (() => void) | null = null;
+const setResult = (key: ResultKey, next: SelResult | null | ((r: SelResult | null) => SelResult | null)) => {
+  results[key] = typeof next === "function" ? next(results[key]) : next;
+  redraw?.();
+};
+const setSummary = (next: Parameters<typeof setResult>[1]) => setResult("summary", next);
+const setRewrite = (next: Parameters<typeof setResult>[1]) => setResult("rewrite", next);
 
 const fmt = (n: number) => n.toLocaleString("ko-KR");
 
@@ -85,8 +101,13 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
     busyRef.current = b;
     setBusyState(b);
   };
-  const [summary, setSummary] = useState<SelResult | null>(null);
-  const [rewrite, setRewrite] = useState<SelResult | null>(null);
+  useEffect(() => {
+    redraw = rerender;
+    return () => {
+      if (redraw === rerender) redraw = null;
+    };
+  }, []);
+  const { summary, rewrite } = results;
   const [question, setQuestion] = useState("");
   const [askNotice, setAskNotice] = useState("");
   const [live, setLive] = useState("");
@@ -126,15 +147,11 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
 
   // 페이지를 바꾸거나 패널을 닫으면 진행 중인 요청을 멈춘다(받을 곳이 없으면 크레딧만 쓴다).
   // 설정·휴지통에 갔다가 같은 페이지로 돌아오면 받은 요약·다듬기 결과는 남기고, 다른 페이지를 열면 버린다(pm 결정).
-  // 대화는 페이지별로 남는다. 패널을 닫으면(언마운트) 지켜보기 해제는 ref로 직접 한다.
-  const watchRef = useRef<Watch | undefined>(undefined);
-  watchRef.current = rewrite?.watch;
-  const resultPage = useRef(pageId);
-  useEffect(() => () => watchRef.current?.dispose(), []);
+  // 대화는 페이지별로 남는다. 패널을 닫았다 열어도 결과는 남고, 연 페이지가 결과의 페이지와 다르면 버린다.
   useEffect(() => {
-    if (pageId !== null && pageId !== resultPage.current) {
-      resultPage.current = pageId;
-      watchRef.current?.dispose();
+    if (pageId !== null && pageId !== results.page) {
+      results.page = pageId;
+      results.rewrite?.watch?.dispose();
       setSummary(null);
       setRewrite(null);
       setAskNotice("");
@@ -411,7 +428,13 @@ export const AiPanel = memo(function AiPanel({ pageId, target, onClose, onOpenSe
                       className="button button-primary"
                       disabled={!canReplace}
                       onClick={() => {
-                        if (shownRewrite.watch?.replace(shownRewrite.text)) setRewrite((r) => r && { ...r, stale: true, replaced: true });
+                        const id = shownRewrite.id;
+                        const ok = shownRewrite.watch?.replace(shownRewrite.text, (s) =>
+                          setRewrite((r) =>
+                            r && r.id === id ? (s === "settled" ? { ...r, settled: true } : { ...r, replaced: s === "replaced", undone: s === "undone" }) : r,
+                          ),
+                        );
+                        if (ok) setRewrite((r) => (r && r.id === id ? { ...r, stale: true, replaced: true } : r));
                       }}
                     >
                       바꾸기
@@ -666,9 +689,10 @@ function ResultCard({
       {result.truncated && <EndNote badge="잘림" reason={TRUNCATED} hasText={!!result.text.trim()} />}
       {result.incomplete && <EndNote badge="끝나지 않음" reason={result.incomplete} hasText={!!result.text.trim()} />}
       {result.replaced ? (
-        <p className="ai-meta">바꿨습니다. Ctrl+Z로 되돌릴 수 있습니다.</p>
+        <p className="ai-meta">{result.settled ? "바꿨습니다." : "바꿨습니다. Ctrl+Z로 되돌릴 수 있습니다."}</p>
       ) : (
         result.stale &&
+        !result.undone &&
         original !== undefined &&
         result.state !== "streaming" && <p className="ai-meta">요청한 뒤 원문이 바뀌었거나 페이지를 다시 열어 바꾸기를 할 수 없습니다.</p>
       )}

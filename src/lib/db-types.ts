@@ -29,6 +29,7 @@ export type AppError = {
     | "InvalidMove" // 자기 자신·하위로 이동, 휴지통 페이지로 이동
     | "InvalidInput" // 잘못된 인자(빈 파일 등)
     | "Db" // SQLite 오류(디스크 가득 참 등). F-05: 화면이 알리고 다음 저장 때 다시 시도
+    | "DbBusy" // 다른 프로그램이 DB 파일을 잠가 쓰지 못함(백업·동기화 등). Db처럼 다시 시도
     | "Io" // 파일 읽기·쓰기 오류(첨부·데이터 폴더)
     | "Migration" // 시작 때 마이그레이션 실패, 더 새 버전 DB
     | "FileTooLarge" // 첨부가 20MB 초과
