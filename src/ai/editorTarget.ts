@@ -10,8 +10,12 @@ export type Snapshot = { from: number; to: number; text: string };
 /** 요청 때 범위를 지켜본다. 그 범위의 글이 바뀌거나 지워지면 stale이 된다(D-28). */
 export type Watch = {
   stale(): boolean;
-  /** 범위를 결과로 바꾼다(실행 취소 한 번). stale이면 false. */
-  replace(text: string): boolean;
+  /**
+   * 범위를 결과로 바꾼다(실행 취소 한 번). stale이면 false.
+   * 바꾼 뒤 문서가 바꾸기 직전과 같아지면(Ctrl+Z) onChange("undone"), 다시 직후와 같아지면(Ctrl+Y) onChange("replaced")를 부른다.
+   * 바꾼 채로 편집기가 없어지면(다른 화면으로 감) 실행 취소 기록도 없어지므로 onChange("settled")를 부른다.
+   */
+  replace(text: string, onChange: (s: "replaced" | "undone" | "settled") => void): boolean;
   dispose(): void;
 };
 
@@ -84,7 +88,7 @@ export function createEditorTarget(editor: Editor): AiTarget {
         to = b.pos;
         if (a.deleted || b.deleted || to <= from || tr.doc.textBetween(from, to, BLOCK_SEP) !== snap.text) mark();
       };
-      const stop = () => {
+      let stop = () => {
         editor.off("transaction", onTr);
         editor.off("destroy", mark);
       };
@@ -93,16 +97,43 @@ export function createEditorTarget(editor: Editor): AiTarget {
       editor.on("destroy", mark);
       return {
         stale: () => stale,
-        replace(text) {
+        replace(text, onChange) {
           const c = content(text);
           if (stale || editor.isDestroyed || !c.length) return false;
           stop(); // 바꾸면서 생기는 변경으로 stale이 되지 않게
           stale = true; // 한 번 바꾼 범위는 다시 바꾸지 않는다
+          const before = editor.state.doc;
           const ok = editor.chain().focus().insertContentAt({ from, to }, c).run();
-          if (!ok) onStale(); // 이제 지켜보지 않으니 패널도 바꾸기를 끈다
-          return ok;
+          if (!ok) {
+            onStale(); // 이제 지켜보지 않으니 패널도 바꾸기를 끈다
+            return false;
+          }
+          // 범위 위치를 따라가면 여러 줄 결과(문단이 갈림)에서 어긋난다. 실행 취소는 나중 편집부터 되돌리므로
+          // 바꾸기를 되돌린 순간의 문서는 바꾸기 직전 문서와 같다. 그래서 문서 전체를 비교한다(바뀌지 않은 노드는 같은 객체라 빠르다).
+          // 바꾼 글을 일부만 고친 경우처럼 둘 다 아니면 이전 상태를 둔다.
+          const after = editor.state.doc;
+          let replaced = true;
+          const onUndo = ({ transaction: tr, appendedTransactions: more = [] }: { transaction: Transaction; appendedTransactions?: Transaction[] }) => {
+            if (!tr.docChanged && !more.some((t) => t.docChanged)) return;
+            const doc = editor.state.doc;
+            const now = doc.eq(before) ? false : doc.eq(after) ? true : replaced;
+            if (now === replaced) return;
+            replaced = now;
+            onChange(now ? "replaced" : "undone");
+          };
+          const onDestroy = () => {
+            stop();
+            if (replaced) onChange("settled");
+          };
+          stop = () => {
+            editor.off("transaction", onUndo);
+            editor.off("destroy", onDestroy);
+          };
+          editor.on("transaction", onUndo);
+          editor.on("destroy", onDestroy);
+          return true;
         },
-        dispose: stop,
+        dispose: () => stop(),
       };
     },
     insertBelow: (text) => {
