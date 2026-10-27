@@ -212,7 +212,7 @@ export type SearchHit = {
 |---|---|---|---|---|
 | `list_tree` | 없음 | `TreeNode[]` | 살아 있는 페이지 전부를 평평한 목록(`parent_id, position` 순)으로 준다. 트리 만들기·트리 경로(검색 결과)·하위 수(삭제 확인 창)는 화면이 이 목록으로 계산한다 | F-01, F-01.3, F-04 |
 | `get_page` | `{ id }` | `Page` | 휴지통 페이지도 읽을 수 있다(휴지통 미리보기용) | F-01 |
-| `create_page` | `{ parentId: PageId \| null }` | `Page` | 부모의 맨 끝에 만든다. 제목 `''`, 본문은 빈 문서 `{"type":"doc","content":[{"type":"paragraph"}]}`. 색인 행도 함께 넣는다. 부모가 있으면 `expanded=1`로 바꾼다 | F-01.1 |
+| `create_page` | `{ parentId: PageId \| null }` | `Page` | 부모의 맨 앞(`position` 0)에 만들고, 기존 형제는 한 칸씩 밀린다. 제목 `''`, 본문은 빈 문서 `{"type":"doc","content":[{"type":"paragraph"}]}`. 색인 행도 함께 넣는다. 부모가 있으면 `expanded=1`로 바꾼다 | F-01.1 |
 | `rename_page` | `{ id, title }` | `{ updatedAt }` | `pages.title`과 `page_fts.title`을 한 트랜잭션에서 고친다. 앞뒤 공백은 잘라 낸다 | F-01.2 |
 | `save_page` | `{ id, content: JSONContent }` | `{ updatedAt }` | **한 트랜잭션**에서 `pages.content`·`updated_at`과 `page_fts.body`를 갱신한다(NF-02). 휴지통 페이지면 `NotFound` | F-05 |
 | `move_page` | `{ id, newParentId: PageId \| null, newPosition: number }` | `void` | 재귀 CTE로 `newParentId`의 조상 사슬에 `id`가 있으면 `InvalidMove`. 옛 형제와 새 형제의 번호를 다시 매긴다. `newPosition`은 새 형제 수로 잘라 낸다 | F-01.4 |
