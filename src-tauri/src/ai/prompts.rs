@@ -7,22 +7,32 @@ macro_rules! data_rule {
     };
 }
 
+/// 모든 system 프롬프트에 넣는 출력 형식 문장. 답은 패널과 노트에 그대로 들어가므로 평문만 쓴다(P4-9).
+macro_rules! plain_rule {
+    () => {
+        " 답은 평문으로만 쓴다. 마크다운 기호(**, #, 1.·- 같은 목록 기호, 백틱)를 쓰지 않는다. 항목을 나열할 때는 한 줄에 하나씩 줄바꿈으로 나눈다."
+    };
+}
+
 pub const SUMMARIZE_SYSTEM: &str = concat!(
     "너는 개인 노트 앱의 요약 도우미다. ",
     data_rule!(),
-    " 노트와 같은 언어로, 핵심만 짧게 요약한다. 요약만 출력하고 머리말은 붙이지 않는다."
+    " 노트와 같은 언어로, 핵심만 짧게 요약한다. 요약만 출력하고 머리말은 붙이지 않는다.",
+    plain_rule!()
 );
 
 pub const REWRITE_SYSTEM: &str = concat!(
     "너는 개인 노트 앱의 글 다듬기 도우미다. ",
     data_rule!(),
-    " 뜻과 정보는 그대로 두고, 맞춤법·문장 흐름을 고쳐 더 읽기 쉽게 다듬는다. 원문과 같은 언어와 형식(문단·목록·제목)을 지킨다. 다듬은 글만 출력하고 설명은 붙이지 않는다."
+    " 뜻과 정보는 그대로 두고, 맞춤법·문장 흐름을 고쳐 더 읽기 쉽게 다듬는다. 원문과 같은 언어와 문단·줄 나눔을 지킨다. 다듬은 글만 출력하고 설명은 붙이지 않는다.",
+    plain_rule!()
 );
 
 pub const ASK_SYSTEM: &str = concat!(
     "너는 개인 노트 앱의 질의응답 도우미다. ",
     data_rule!(),
-    " 노트 내용을 바탕으로 사용자의 질문에 답한다. 노트에 없는 내용으로 답할 때는 노트에 없다는 것을 밝힌다. 질문과 같은 언어로 답한다."
+    " 노트 내용을 바탕으로 사용자의 질문에 답한다. 노트에 없는 내용으로 답할 때는 노트에 없다는 것을 밝힌다. 질문과 같은 언어로 답한다.",
+    plain_rule!()
 );
 
 pub fn summarize_user(text: &str) -> String {
@@ -50,6 +60,7 @@ mod tests {
     fn systems_state_data_rule() {
         for s in [SUMMARIZE_SYSTEM, REWRITE_SYSTEM, ASK_SYSTEM] {
             assert!(s.contains(data_rule!()));
+            assert!(s.contains(plain_rule!()));
         }
         assert!(summarize_user("x").ends_with("<note>\nx\n</note>"));
     }
