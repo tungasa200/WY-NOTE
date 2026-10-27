@@ -12,6 +12,7 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import FileHandler from "@tiptap/extension-file-handler";
+import TextAlign from "@tiptap/extension-text-align";
 import { redoDepth, undoDepth } from "@tiptap/pm/history";
 import { NodeSelection } from "@tiptap/pm/state";
 import { CODE_LANGUAGES, lowlight } from "./lowlight";
@@ -20,6 +21,8 @@ import { ImageBatch } from "./imageNotice";
 import { BlockMove } from "./blockMove";
 import { SlashCommand } from "./slashMenu";
 import { BlockHandle } from "./BlockHandle";
+import { TableTools } from "./TableTools";
+import { Icon, type IconName } from "./icons";
 import { EmptyParagraphHint } from "./placeholder";
 import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from "./uploadPlaceholder";
 import { PasteGuard } from "./paste";
@@ -84,6 +87,8 @@ const createExtensions = (handlers: ImageHandlers) => [
   // 열이 많아도 셀이 뭉개지지 않게 최소 너비를 두고, 넘치면 표만 가로로 스크롤한다.
   TableKit.configure({ table: { resizable: false, cellMinWidth: 80 } }),
   // Tab은 2칸(S-06).
+  // 문단·제목 정렬. 단축키는 확장 기본값(Ctrl+Shift+L/E/R/J).
+  TextAlign.configure({ types: ["heading", "paragraph"] }),
   CodeBlockLowlight.configure({ lowlight, enableTabIndentation: true, tabSize: 2 }),
   WyImage,
   // 형식은 여기서 거르지 않는다. 허용 밖 파일도 받아서 넣지 않은 이유를 알린다(ImageBatch.check).
@@ -219,6 +224,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       >
         <BlockHandle editor={editor} wrapRef={wrapRef} />
         <EditorContent editor={editor} />
+        <TableTools editor={editor} wrapRef={wrapRef} />
       </div>
       {link.menu}
     </div>
@@ -247,6 +253,10 @@ function Toolbar({
       code: e.isActive("codeBlock"),
       codeLanguage: (e.getAttributes("codeBlock").language as string | null) ?? "",
       inTable: e.isActive("table"),
+      // 정렬을 줄 수 있는 블록(문단·제목)일 때만 지금 정렬을 돌려준다. 값이 없으면 왼쪽.
+      align: ["paragraph", "heading"].includes(e.state.selection.$from.parent.type.name)
+        ? ((e.state.selection.$from.parent.attrs.textAlign as string | null) ?? "left")
+        : null,
       canUndo: undoDepth(e.state) > 0,
       canRedo: redoDepth(e.state) > 0,
     }),
@@ -289,26 +299,42 @@ function Toolbar({
         </select>
       </div>
       <div className="editor-toolbar-group">
+        {ALIGNMENTS.map(({ value, label, icon, keys }) => (
+          <ToolButton
+            key={value}
+            label={label}
+            icon={icon}
+            keys={keys}
+            pressed={s.align === value}
+            disabled={s.align === null}
+            onClick={() => run().setTextAlign(value).run()}
+          />
+        ))}
+      </div>
+      <div className="editor-toolbar-group">
+        {/* 행·열 수정 도구는 커서가 표 안에 있을 때 표 아래에 뜬다(TableTools). */}
         <ToolButton
           label="표 넣기"
           disabled={s.inTable}
           onClick={() => run().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
         />
-        <ToolButton label="행 추가" disabled={!s.inTable} onClick={() => run().addRowAfter().run()} />
-        <ToolButton label="행 삭제" disabled={!s.inTable} onClick={() => run().deleteRow().run()} />
-        <ToolButton label="열 추가" disabled={!s.inTable} onClick={() => run().addColumnAfter().run()} />
-        <ToolButton label="열 삭제" disabled={!s.inTable} onClick={() => run().deleteColumn().run()} />
-        <ToolButton label="표 삭제" disabled={!s.inTable} onClick={() => run().deleteTable().run()} />
-      </div>
-      <div className="editor-toolbar-group">
         <ToolButton label="이미지 넣기" disabled={!canInsertImage} onClick={onPickImage} />
       </div>
     </div>
   );
 }
 
+const ALIGNMENTS: { value: string; label: string; icon: IconName; keys: string }[] = [
+  { value: "left", label: "왼쪽 정렬", icon: "alignLeft", keys: "Control+Shift+L" },
+  { value: "center", label: "가운데 정렬", icon: "alignCenter", keys: "Control+Shift+E" },
+  { value: "right", label: "오른쪽 정렬", icon: "alignRight", keys: "Control+Shift+R" },
+  { value: "justify", label: "양쪽 정렬", icon: "alignJustify", keys: "Control+Shift+J" },
+];
+
 type ToolButtonProps = {
   label: string;
+  /** 있으면 글자 대신 아이콘을 보이고, label은 이름(aria-label)으로 쓴다. */
+  icon?: IconName;
   /** 단축키(aria-keyshortcuts 형식) */
   keys?: string;
   /** 마크다운 단축 입력 안내 */
@@ -318,19 +344,20 @@ type ToolButtonProps = {
   onClick: () => void;
 };
 
-function ToolButton({ label, keys, hint, pressed, disabled, onClick }: ToolButtonProps) {
-  const tip = keys ? keys.replace("Control", "Ctrl") : hint ? `입력: ${hint}` : undefined;
+function ToolButton({ label, icon, keys, hint, pressed, disabled, onClick }: ToolButtonProps) {
+  const tip = keys ? keys.replace(/Control/g, "Ctrl") : hint ? `입력: ${hint}` : undefined;
   return (
     <button
       type="button"
       className="editor-button"
+      aria-label={icon ? label : undefined}
       aria-pressed={pressed}
       aria-keyshortcuts={keys}
       title={tip ? `${label} (${tip})` : undefined}
       disabled={disabled}
       onClick={onClick}
     >
-      {label}
+      {icon ? <Icon name={icon} /> : label}
     </button>
   );
 }
