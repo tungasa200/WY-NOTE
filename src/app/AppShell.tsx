@@ -18,7 +18,7 @@ import { Autosaver, type SaveStatus } from "./autosave";
 import { CloseSaveDialog } from "./CloseSaveDialog";
 import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
-import { Toast, type ToastData } from "./Toast";
+import { closeToast, pushToast, Toast, type ToastData, type ToastQueue } from "./Toast";
 import "./AppShell.css";
 
 type View = "page" | "trash" | "settings";
@@ -84,9 +84,10 @@ export function AppShell() {
   const [closePrompt, setClosePrompt] = useState<ClosePrompt | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "saved" });
   const [confirmTrash, setConfirmTrash] = useState<{ id: PageId; count: number } | null>(null);
-  const [toast, setToastState] = useState<(ToastData & { id: number }) | null>(null);
+  const [toasts, setToasts] = useState<ToastQueue>({ current: null, waiting: null });
+  const toast = toasts.current;
   // 같은 문구가 다시 와도 5초를 새로 센다.
-  const setToast = useCallback((t: ToastData) => setToastState({ ...t, id: Date.now() }), []);
+  const setToast = useCallback((t: ToastData) => setToasts((q) => pushToast(q, t)), []);
   const notify = useCallback((message: string) => setToast({ message }), [setToast]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -677,7 +678,10 @@ export function AppShell() {
         />
       )}
 
-      {toast && <Toast key={toast.id} data={toast} onClose={() => setToastState(null)} />}
+      {/* 읽기 프로그램은 미리 있던 라이브 영역의 바뀐 내용만 읽으므로 틀은 늘 둔다. */}
+      <div role="status">
+        {toast && <Toast key={toast.id} data={toast} onClose={() => setToasts((q) => closeToast(q, toast.id))} />}
+      </div>
     </div>
   );
 }
