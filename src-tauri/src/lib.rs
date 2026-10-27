@@ -53,7 +53,7 @@ pub fn run() {
             // 실패해도 앱은 띄우고, 명령마다 이 오류를 돌려줘 화면이 알리게 한다.
             let db = std::fs::create_dir_all(data_dir.join("attachments"))
                 .map_err(error::AppError::from)
-                .and_then(|_| db::open(&data_dir.join("wy-note.db")));
+                .and_then(|_| db::open_pair(&data_dir.join("wy-note.db")));
             if let Err(e) = &db {
                 eprintln!("DB 열기 실패: {e}");
             }

@@ -6,7 +6,7 @@ pub mod pages;
 pub mod search;
 
 use crate::error::AppResult;
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -16,6 +16,14 @@ pub fn open(path: &Path) -> AppResult<Connection> {
     configure(&conn)?;
     migrations::migrate(&mut conn, migrations::MIGRATIONS, Some(path))?;
     Ok(conn)
+}
+
+/// (쓰기 연결, 읽기 전용 연결)(계약 3절, P4-6). 읽기 연결은 마이그레이션이 끝난 뒤에 연다.
+/// busy_timeout은 명령마다 `commands::lock`이 정한다.
+pub fn open_pair(path: &Path) -> AppResult<(Connection, Connection)> {
+    let write = open(path)?;
+    let read = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
+    Ok((write, read))
 }
 
 fn configure(conn: &Connection) -> AppResult<()> {

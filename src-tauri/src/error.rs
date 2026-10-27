@@ -8,6 +8,8 @@ pub enum ErrorKind {
     InvalidMove,
     InvalidInput,
     Db,
+    /// 다른 프로그램이 DB를 잡고 있어 5초 안에 쓰지 못함(SQLITE_BUSY, P4-6)
+    DbBusy,
     Io,
     Migration,
     /// 첨부가 20MB 초과(계약 v2)
@@ -56,7 +58,12 @@ impl std::error::Error for AppError {}
 
 impl From<rusqlite::Error> for AppError {
     fn from(e: rusqlite::Error) -> Self {
-        Self::new(ErrorKind::Db, e.to_string())
+        // SQLITE_LOCKED는 같은 연결 안의 충돌(코드 결함)이라 다른 프로그램 탓인 DbBusy로 보지 않는다.
+        let kind = match e.sqlite_error_code() {
+            Some(rusqlite::ErrorCode::DatabaseBusy) => ErrorKind::DbBusy,
+            _ => ErrorKind::Db,
+        };
+        Self::new(kind, e.to_string())
     }
 }
 
