@@ -17,6 +17,7 @@ import { ancestors, descendantIds, indexTree } from "../tree/tree";
 import { Autosaver, type SaveStatus } from "./autosave";
 import { applyAppearance, cacheAppearance, cachedAppearance, readAppearance, type Appearance } from "./appearance";
 import { CloseSaveDialog } from "./CloseSaveDialog";
+import { PageToc } from "./PageToc";
 import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
 import { closeToast, pushToast, Toast, type ToastData, type ToastQueue } from "./Toast";
@@ -66,6 +67,8 @@ export function AppShell() {
     // 페이지를 바꾸면 새 편집기가 먼저 붙고 옛 편집기가 나중에 떨어질 수 있다: 지금 편집기일 때만 비운다.
     setEditor((cur) => (attached ? ed : cur === ed ? null : cur));
   }, []);
+  // 본문 스크롤 영역. 목차가 제목으로 스크롤한다.
+  const contentRef = useRef<HTMLDivElement>(null);
   const aiTarget = useMemo(() => (editor ? createEditorTarget(editor) : null), [editor]);
   const [layout, setLayout] = useState<Layout>({ sidebar: true, ai: false });
   // 저장한 화면 상태를 받기 전에 사용자가 바꿨으면, 늦게 온 저장값으로 덮지 않는다.
@@ -604,39 +607,42 @@ export function AppShell() {
           </div>
         )}
 
-        <div className="content">
-          {loadError ? (
-            <div className="content-message" role="alert">
-              <p>데이터를 불러오지 못했습니다. {loadError}.</p>
-              <button type="button" className="button" onClick={() => window.location.reload()}>
-                다시 불러오기
-              </button>
-            </div>
-          ) : view === "settings" ? (
-            <SettingsView appearance={appearance} onAppearance={setAppearance} appearanceSaves={appearanceSaves} />
-          ) : view === "trash" ? (
-            <TrashPanel
-              key={trashVersion}
-              list={api.listTrash}
-              restore={api.restorePage}
-              deletePermanently={api.deletePagePermanently}
-              empty={api.emptyTrash}
-              onRestored={onRestored}
-            />
-          ) : empty ? (
-            <EmptyState onCreate={() => void createPage(null)} />
-          ) : page && openNode ? (
-            <PageView
-              key={page.id}
-              page={page}
-              title={openNode.title}
-              focusTitle={focusTitle}
-              onTitleChange={(t) => renamePage(page.id, t)}
-              onContentChange={(doc: JSONContent) => saver.setContent(page.id, doc)}
-              onEditor={onEditor}
-              onNotify={notify}
-            />
-          ) : null}
+        <div className="content-area">
+          <div className="content" ref={contentRef}>
+            {loadError ? (
+              <div className="content-message" role="alert">
+                <p>데이터를 불러오지 못했습니다. {loadError}.</p>
+                <button type="button" className="button" onClick={() => window.location.reload()}>
+                  다시 불러오기
+                </button>
+              </div>
+            ) : view === "settings" ? (
+              <SettingsView appearance={appearance} onAppearance={setAppearance} appearanceSaves={appearanceSaves} />
+            ) : view === "trash" ? (
+              <TrashPanel
+                key={trashVersion}
+                list={api.listTrash}
+                restore={api.restorePage}
+                deletePermanently={api.deletePagePermanently}
+                empty={api.emptyTrash}
+                onRestored={onRestored}
+              />
+            ) : empty ? (
+              <EmptyState onCreate={() => void createPage(null)} />
+            ) : page && openNode ? (
+              <PageView
+                key={page.id}
+                page={page}
+                title={openNode.title}
+                focusTitle={focusTitle}
+                onTitleChange={(t) => renamePage(page.id, t)}
+                onContentChange={(doc: JSONContent) => saver.setContent(page.id, doc)}
+                onEditor={onEditor}
+                onNotify={notify}
+              />
+            ) : null}
+          </div>
+          {view === "page" && page && editor && <PageToc key={page.id} editor={editor} scrollerRef={contentRef} aiOpen={layout.ai} />}
         </div>
       </main>
 

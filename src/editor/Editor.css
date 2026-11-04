@@ -87,7 +87,8 @@
   --checkbox-size: 16px;
   /* 왼쪽 --editor-gutter는 블록 손잡이 자리(S-06) */
   max-width: calc(var(--editor-max-width) + var(--editor-gutter) + var(--space-4));
-  margin: 0 auto;
+  /* 손잡이 자리(왼쪽 여백)와 오른쪽 16px를 .page 여백 안으로 내보내 글 폭을 제목 칸과 같게 한다(P5-7). */
+  margin: 0 calc(-1 * var(--space-4)) 0 calc(-1 * var(--editor-gutter));
   padding: var(--space-6) var(--space-4) var(--editor-bottom-space, 96px) var(--editor-gutter);
   min-height: 60vh;
   outline: none;

@@ -1,0 +1,127 @@
+/* 목차(P5-6, 화면설계 S-06). 편집 영역(.content-area) 오른쪽 가장자리의 감지 띠와 그 위에 뜨는 제목 목록.
+   top·right·width·max-height는 화면이 잰다(도구 막대 아래, 스크롤 막대·겹친 AI 패널 왼쪽). */
+.toc-edge {
+  position: absolute;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  width: var(--space-6); /* 보이지 않는 감지 띠 24px */
+}
+
+.toc {
+  position: absolute;
+  z-index: var(--z-popover);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--shadow-popover);
+  animation: toc-in var(--duration-fast) var(--ease-out);
+}
+
+@keyframes toc-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toc {
+    animation-name: toc-fade;
+    animation-duration: 120ms;
+  }
+
+  @keyframes toc-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+.toc-head {
+  display: flex;
+  align-items: center;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 항목 28px, 한 줄 말줄임. 제목 2는 13px 1단계, 아래에서 1·3을 덮는다. */
+.toc-item {
+  display: block;
+  width: 100%;
+  height: var(--tree-row-height);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: var(--tree-row-height);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 위계: 들여쓰기 제목1 0 / 제목2 12 / 제목3 24px(왼쪽 여백 8에 더함) */
+.toc-item[data-level="1"] {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.toc-item[data-level="2"] {
+  padding-left: calc(var(--space-2) + var(--space-3));
+}
+
+.toc-item[data-level="3"] {
+  padding-left: calc(var(--space-2) + var(--space-6));
+  color: var(--color-text-secondary);
+}
+
+.toc-item[data-empty] {
+  color: var(--color-text-tertiary);
+}
+
+.toc-item:hover {
+  background: var(--color-bg-hover);
+}
+
+/* 지금 보이는 제목: 선택 바탕 위에는 3단계 글자를 쓰지 않는다. */
+.toc-item[aria-current="location"] {
+  background: var(--color-bg-selected);
+  color: var(--color-text);
+}
+
+.toc-item[aria-current="location"][data-empty] {
+  color: var(--color-text-secondary);
+}
+
+/* 스크롤 상자 안이라 고리를 안쪽에 그린다. */
+.toc-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+  .toc {
+    border-color: CanvasText;
+  }
+
+  .toc-item[aria-current="location"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
