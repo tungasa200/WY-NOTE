@@ -119,7 +119,21 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
     ro.observe(area);
     const bar = scroller.querySelector(".editor-toolbar");
     if (bar) ro.observe(bar);
-    return () => ro.disconnect();
+    // 도구 막대는 sticky라 붙기 전에는 스크롤에 따라 아래 끝이 움직인다. 붙은 뒤에는 값이 같아 다시 그리지 않는다.
+    let frame = 0;
+    const onScroll = () => {
+      if (!frame)
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          measure();
+        });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", onScroll);
+    };
   }, [scrollerRef, viewTop, aiOpen, headings.length]);
 
   /**
