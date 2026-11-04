@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/app/PageToc.css"
+        ],
+        "createdAt": "2026-11-04T11:12:04.869Z",
+        "reason": "NOTE-design audit P2 (2026-11-04): forced-colors only current-heading marker in TOC list, border-left 3px Highlight so outline stays for focus; not a card accent"
+      }
+    ]
+  }
+}
