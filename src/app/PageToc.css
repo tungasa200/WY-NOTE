@@ -109,8 +109,11 @@
   color: var(--color-text-secondary);
 }
 
-/* 스크롤 상자 안이라 고리를 안쪽에 그린다. */
-.toc-item:focus-visible {
+/* 스크롤 상자 안이라 고리를 안쪽에 그린다.
+   키보드로 연 목록은 포커스를 프로그램으로 옮겨, 트리 줄을 마우스로 누른 뒤면 :focus-visible이 꺼진다.
+   그 목록의 항목은 마우스로 포커스를 받지 않으므로(mousedown 막음) :focus로 그린다. */
+.toc-item:focus-visible,
+.toc--keyboard .toc-item:focus {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: -2px;
 }
@@ -132,5 +135,11 @@
 
   .toc-item[aria-current="location"][data-level="3"] {
     padding-left: calc(var(--space-2) + var(--space-6) - 3px);
+  }
+
+  /* 키보드로 연 목록의 :focus도 :focus-visible과 같은 색으로. */
+  .toc-item:focus-visible,
+  .toc--keyboard .toc-item:focus {
+    outline-color: Highlight;
   }
 }
