@@ -30,7 +30,7 @@
 @media (prefers-reduced-motion: reduce) {
   .toc {
     animation-name: toc-fade;
-    animation-duration: 120ms;
+    animation-duration: var(--duration-base);
   }
 
   @keyframes toc-fade {
@@ -120,8 +120,17 @@
     border-color: CanvasText;
   }
 
+  /* 지금 제목은 왼쪽 막대로, outline은 포커스에만 쓴다. 막대 3px만큼 왼쪽 여백을 줄여 글자 자리를 지킨다. */
   .toc-item[aria-current="location"] {
-    outline: 2px solid Highlight;
-    outline-offset: -2px;
+    border-left: 3px solid Highlight;
+    padding-left: calc(var(--space-2) - 3px);
+  }
+
+  .toc-item[aria-current="location"][data-level="2"] {
+    padding-left: calc(var(--space-2) + var(--space-3) - 3px);
+  }
+
+  .toc-item[aria-current="location"][data-level="3"] {
+    padding-left: calc(var(--space-2) + var(--space-6) - 3px);
   }
 }
