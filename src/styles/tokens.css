@@ -127,7 +127,12 @@
   --sidebar-width-max: 360px;
   --ai-panel-width: 340px;       /* 끌어서 300~480px */
   --topbar-height: 44px;
-  --editor-max-width: 720px;     /* 본문 한 줄 약 45자(한글) */
+  /*
+   * 본문 글 폭 = 제목 칸 글 폭(P5-7). 편집 영역(.content, 스크롤 막대 뺀 폭)에 따라 720~960px(한 줄 한글 약 45~60자).
+   * 240 = 손잡이 여백 72×2 + 양옆 숨 쉴 자리 48×2. .content가 스크롤바 자리를 늘 비워 두므로(scrollbar-gutter: stable) cqi는 스크롤바를 뺀 폭이다. cqi는 쓰는 곳의 가장 가까운 컨테이너(.content)로 풀린다.
+   * 실제 글 폭은 min(이 값, 편집 영역 - 2×여백)이라 D-39 겹침 기준(본문 480 밑)에는 영향이 없다.
+   */
+  --editor-max-width: clamp(720px, 100cqi - 240px, 960px);
   --editor-gutter: 72px;         /* 본문 왼쪽: 블록 손잡이 자리 */
   --editor-bottom-space: 96px;   /* 본문 아래 여백: 마지막 줄 아래를 눌러 이어 쓰는 자리 */
   --tree-row-height: 28px;
