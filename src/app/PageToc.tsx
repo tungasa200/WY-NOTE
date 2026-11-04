@@ -266,7 +266,8 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
       />
       {open && (
         <nav
-          className="toc"
+          // 키보드로 열면 포커스를 프로그램으로 옮기므로, 마우스로 누른 뒤라도 고리가 보이게 클래스로 그린다(T-TOC-08).
+          className={open === "keyboard" ? "toc toc--keyboard" : "toc"}
           aria-label="목차"
           aria-keyshortcuts="Control+Shift+O"
           style={{ top: place.top + LIST_INSET, right: place.right + LIST_INSET, width: place.width, maxHeight: place.maxHeight }}
