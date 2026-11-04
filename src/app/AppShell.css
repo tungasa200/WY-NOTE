@@ -271,11 +271,22 @@
 }
 
 /* ── 페이지(S-06 제목 + 본문) ── */
+/* 짧은 페이지도 스크롤 영역(.content) 높이를 넘지 않고 채운다. 남은 높이는 본문(.page-body → .editor-body)이 받아
+   아래 빈 곳을 눌러 이어 쓸 수 있다(T-UI-09). */
 .page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   max-width: calc(var(--editor-max-width) + 2 * var(--editor-gutter));
   margin: 0 auto;
   padding: var(--space-10) var(--editor-gutter) var(--space-18);
   box-sizing: border-box;
+}
+
+.page-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .page-title {
