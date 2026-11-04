@@ -3,6 +3,7 @@
   position: relative; /* 좁은 창에서 겹쳐 띄우는 AI 패널의 기준 */
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--ai-panel-width);
+  grid-template-rows: minmax(0, 1fr); /* 격자 밖 항목이 생겨도 창 높이를 나눠 갖지 않게 */
   height: 100%;
 }
 
@@ -410,6 +411,10 @@
 }
 
 /* ── 알림 ── */
+.toast-region {
+  position: absolute; /* 격자 흐름에서 뺀다. 알림 자체는 fixed로 뜬다 */
+}
+
 .toast {
   position: fixed;
   left: 50%;

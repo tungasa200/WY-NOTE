@@ -710,7 +710,7 @@ export function AppShell() {
       )}
 
       {/* 읽기 프로그램은 미리 있던 라이브 영역의 바뀐 내용만 읽으므로 틀은 늘 둔다. */}
-      <div role="status">
+      <div className="toast-region" role="status">
         {toast && <Toast key={toast.id} data={toast} onClose={() => setToasts((q) => closeToast(q, toast.id))} />}
       </div>
     </div>
