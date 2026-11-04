@@ -36,6 +36,9 @@ const BODY_KEEP = 48;
 
 type Place = { top: number; right: number; width: number; maxHeight: number };
 
+/** 목록과 같은 층에 뜨는 편집기 메뉴(/ 메뉴, 링크 메뉴 같은 맥락 메뉴)가 열려 있는지. */
+const menuOpen = () => !!document.querySelector(".slash-menu, [role='menu']");
+
 type Props = {
   editor: EditorInstance;
   /** 본문 스크롤 영역(.content). 부모(.content-area)가 띠·목록의 기준이다. */
@@ -180,8 +183,19 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
   const clearHover = () => window.clearTimeout(hoverTimer.current);
   const hoverEnter = () => {
     clearHover();
-    if (!open) hoverTimer.current = window.setTimeout(() => setOpen("hover"), OPEN_DELAY_MS);
+    if (!open) hoverTimer.current = window.setTimeout(() => !menuOpen() && setOpen("hover"), OPEN_DELAY_MS);
   };
+
+  // 마우스로 연 목록은 / 메뉴·링크 메뉴가 뜨면 닫는다. 같은 층(30)이라 좁은 창에서 메뉴를 덮는다(T-TOC-11).
+  // 키보드로 연 목록은 포커스가 목록에 있어 메뉴가 뜨지 않고, 뜨면 바깥으로 포커스가 나가 닫힌다.
+  useEffect(() => {
+    if (open !== "hover") return;
+    const mo = new MutationObserver(() => {
+      if (menuOpen()) setOpen(null);
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [open]);
   const hoverLeave = () => {
     clearHover();
     hoverTimer.current = window.setTimeout(() => setOpen((o) => (o === "hover" ? null : o)), CLOSE_DELAY_MS);
