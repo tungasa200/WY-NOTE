@@ -20,7 +20,8 @@
      50cqi는 .content 폭의 절반이라 .page 가운데 정렬만큼 양옆으로 넓힌다. 첫 버튼은 본문 글 시작선에 맞춘다. */
   --toolbar-bleed: calc(50cqi - 50%);
   margin-inline: calc(-1 * var(--toolbar-bleed));
-  padding: var(--space-1) var(--space-4) var(--space-1) var(--toolbar-bleed);
+  /* --toolbar-cover: 겹쳐 뜬 AI 패널에 가려진 폭(Toolbar.tsx가 적는다). 도구는 패널 왼쪽까지만 놓인다. */
+  padding: var(--space-1) calc(var(--space-4) + var(--toolbar-cover, 0px)) var(--space-1) var(--toolbar-bleed);
   border-bottom: 1px solid var(--color-divider);
   background: var(--color-bg);
 }
@@ -38,6 +39,14 @@
   height: 16px;
   margin: 0 6px;
   background: var(--color-divider);
+}
+
+/* 고대비 모드에서는 바탕색이 지워지므로 선을 테두리로 그린다(폭 1px 그대로). */
+@media (forced-colors: active) {
+  .editor-toolbar-sep {
+    width: 0;
+    border-left: 1px solid CanvasText;
+  }
 }
 
 /* 설계의 버튼 높이 30px(누르는 영역 기준은 24px, 사용자 결정). 테두리 없는 버튼, 상태는 바탕색으로 보인다. */
@@ -96,6 +105,12 @@
   .editor-button[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -4px;
+  }
+
+  /* 마우스를 올린 버튼도 바탕 대신 선으로 보인다('더 보기' 메뉴 항목과 같다). */
+  .editor-button:hover:not(:disabled) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }
 
@@ -178,10 +193,20 @@
 }
 
 @media (forced-colors: active) {
+  .toolbar-menu-sep {
+    height: 0;
+    border-top: 1px solid CanvasText;
+  }
+
+  .toolbar-menu-item:hover,
   .toolbar-menu-item:focus-visible,
   .toolbar-menu-item[aria-checked="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+
+  .toolbar-menu-item[aria-disabled="true"] {
+    color: GrayText;
   }
 }
 
