@@ -13,17 +13,31 @@
   top: 0;
   z-index: var(--z-sticky);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-1) var(--space-4);
+  /* 늘 한 줄(S-06 v0.8). 넘치는 도구는 '더 보기' 메뉴로 접는다(Toolbar.tsx가 폭을 센다). */
+  flex-wrap: nowrap;
+  align-items: center;
+  /* 막대는 본문 최대 폭이 아니라 편집 영역(.content) 폭을 쓴다(pm 결정, 기본 창에서 도구가 접히지 않게).
+     50cqi는 .content 폭의 절반이라 .page 가운데 정렬만큼 양옆으로 넓힌다. 첫 버튼은 본문 글 시작선에 맞춘다. */
+  --toolbar-bleed: calc(50cqi - 50%);
+  margin-inline: calc(-1 * var(--toolbar-bleed));
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--toolbar-bleed);
   border-bottom: 1px solid var(--color-divider);
   background: var(--color-bg);
 }
 
 .editor-toolbar-group {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
   gap: var(--space-0-5);
+}
+
+/* 묶음 사이 13px = 여백 6 + 선 1 + 여백 6. 폭을 바꾸면 Toolbar.tsx의 SEP도 바꾼다. */
+.editor-toolbar-sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--color-divider);
 }
 
 /* 설계의 버튼 높이 30px(누르는 영역 기준은 24px, 사용자 결정). 테두리 없는 버튼, 상태는 바탕색으로 보인다. */
@@ -43,10 +57,20 @@
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-/* 코드 언어 선택은 24px(S-06) */
+/* 도구 막대 버튼은 30×30 아이콘 버튼. 폭을 바꾸면 Toolbar.tsx의 BUTTON도 바꾼다. */
+.editor-toolbar .editor-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--control-height);
+  padding: 0;
+}
+
+/* 코드 언어 선택은 24px(S-06), 코드 블록 안에서만 막대 맨 오른쪽 끝에 보인다(P6-2). */
 .editor-select {
+  flex: none;
   min-height: var(--control-height-sm);
-  align-self: center;
+  margin-left: auto;
   border: 1px solid var(--color-border);
   background: var(--color-bg-raised);
 }
@@ -85,6 +109,80 @@
 .editor-select:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
+}
+
+/* 도구 막대 '더 보기' 메뉴(S-06 v0.8). 자리는 Toolbar.tsx가 정한다. */
+.toolbar-menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  min-width: 200px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--shadow-popover);
+}
+
+.toolbar-menu-sep {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--color-divider);
+}
+
+.toolbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar-menu-item kbd {
+  margin-left: auto;
+  padding: 0 0 0 var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.toolbar-menu-item[aria-checked="true"] {
+  background: var(--color-bg-selected);
+}
+
+.toolbar-menu-item:hover,
+.toolbar-menu-item:focus-visible {
+  background: var(--color-bg-hover);
+  outline: none;
+}
+
+.toolbar-menu-item[aria-disabled="true"] {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.toolbar-menu-item[aria-disabled="true"] kbd {
+  color: inherit;
+}
+
+@media (forced-colors: active) {
+  .toolbar-menu-item:focus-visible,
+  .toolbar-menu-item[aria-checked="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .editor-body {

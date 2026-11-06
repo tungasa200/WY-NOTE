@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   EditorContent,
   useEditor,
-  useEditorState,
   type Editor as TiptapEditor,
   type FocusPosition,
   type JSONContent,
@@ -13,16 +12,15 @@ import { TableKit } from "@tiptap/extension-table";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import FileHandler from "@tiptap/extension-file-handler";
 import TextAlign from "@tiptap/extension-text-align";
-import { redoDepth, undoDepth } from "@tiptap/pm/history";
 import { NodeSelection } from "@tiptap/pm/state";
-import { CODE_LANGUAGES, lowlight } from "./lowlight";
+import { lowlight } from "./lowlight";
 import { IMAGE_TYPES, WyImage } from "./image";
 import { ImageBatch } from "./imageNotice";
 import { BlockMove } from "./blockMove";
 import { SlashCommand } from "./slashMenu";
 import { BlockHandle } from "./BlockHandle";
 import { TableTools } from "./TableTools";
-import { Icon, type IconName } from "./icons";
+import { Toolbar } from "./Toolbar";
 import { EmptyParagraphHint } from "./placeholder";
 import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from "./uploadPlaceholder";
 import { PasteGuard } from "./paste";
@@ -228,136 +226,5 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       </div>
       {link.menu}
     </div>
-  );
-}
-
-function Toolbar({
-  editor,
-  canInsertImage,
-  onPickImage,
-}: {
-  editor: TiptapEditor;
-  canInsertImage: boolean;
-  onPickImage: () => void;
-}) {
-  const s = useEditorState({
-    editor,
-    selector: ({ editor: e }) => ({
-      paragraph: e.isActive("paragraph"),
-      h1: e.isActive("heading", { level: 1 }),
-      h2: e.isActive("heading", { level: 2 }),
-      h3: e.isActive("heading", { level: 3 }),
-      bullet: e.isActive("bulletList"),
-      ordered: e.isActive("orderedList"),
-      task: e.isActive("taskList"),
-      code: e.isActive("codeBlock"),
-      codeLanguage: (e.getAttributes("codeBlock").language as string | null) ?? "",
-      inTable: e.isActive("table"),
-      // 정렬을 줄 수 있는 블록(문단·제목)일 때만 지금 정렬을 돌려준다. 값이 없으면 왼쪽.
-      align: ["paragraph", "heading"].includes(e.state.selection.$from.parent.type.name)
-        ? ((e.state.selection.$from.parent.attrs.textAlign as string | null) ?? "left")
-        : null,
-      canUndo: undoDepth(e.state) > 0,
-      canRedo: redoDepth(e.state) > 0,
-    }),
-  });
-  const run = () => editor.chain().focus();
-
-  // 버튼은 눌러도 사라지지 않고 비활성화만 되므로 포커스가 길을 잃지 않는다.
-  return (
-    <div className="editor-toolbar" role="toolbar" aria-label="블록 서식">
-      <div className="editor-toolbar-group">
-        <ToolButton label="실행 취소" keys="Control+Z" disabled={!s.canUndo} onClick={() => run().undo().run()} />
-        <ToolButton label="다시 실행" keys="Control+Y" disabled={!s.canRedo} onClick={() => run().redo().run()} />
-      </div>
-      <div className="editor-toolbar-group">
-        <ToolButton label="본문" pressed={s.paragraph} onClick={() => run().setParagraph().run()} />
-        <ToolButton label="제목 1" hint="#" pressed={s.h1} onClick={() => run().toggleHeading({ level: 1 }).run()} />
-        <ToolButton label="제목 2" hint="##" pressed={s.h2} onClick={() => run().toggleHeading({ level: 2 }).run()} />
-        <ToolButton label="제목 3" hint="###" pressed={s.h3} onClick={() => run().toggleHeading({ level: 3 }).run()} />
-        <ToolButton label="글머리 목록" hint="-" pressed={s.bullet} onClick={() => run().toggleBulletList().run()} />
-        <ToolButton label="번호 목록" hint="1." pressed={s.ordered} onClick={() => run().toggleOrderedList().run()} />
-        <ToolButton label="체크리스트" hint="[]" pressed={s.task} onClick={() => run().toggleTaskList().run()} />
-        <ToolButton label="코드 블록" hint="```" pressed={s.code} onClick={() => run().toggleCodeBlock().run()} />
-        <select
-          className="editor-select"
-          aria-label="코드 언어"
-          disabled={!s.code}
-          value={s.codeLanguage}
-          onChange={(e) => editor.commands.updateAttributes("codeBlock", { language: e.target.value || null })}
-        >
-          <option value="">언어 없음</option>
-          {/* ```js처럼 별칭으로 만든 블록도 지금 값이 보이게 한다. */}
-          {s.codeLanguage && !CODE_LANGUAGES.some((l) => l.value === s.codeLanguage) && (
-            <option value={s.codeLanguage}>{s.codeLanguage}</option>
-          )}
-          {CODE_LANGUAGES.map((l) => (
-            <option key={l.value} value={l.value}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="editor-toolbar-group">
-        {ALIGNMENTS.map(({ value, label, icon, keys }) => (
-          <ToolButton
-            key={value}
-            label={label}
-            icon={icon}
-            keys={keys}
-            pressed={s.align === value}
-            disabled={s.align === null}
-            onClick={() => run().setTextAlign(value).run()}
-          />
-        ))}
-      </div>
-      <div className="editor-toolbar-group">
-        {/* 행·열 수정 도구는 커서가 표 안에 있을 때 표 아래에 뜬다(TableTools). */}
-        <ToolButton
-          label="표 넣기"
-          disabled={s.inTable}
-          onClick={() => run().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-        />
-        <ToolButton label="이미지 넣기" disabled={!canInsertImage} onClick={onPickImage} />
-      </div>
-    </div>
-  );
-}
-
-const ALIGNMENTS: { value: string; label: string; icon: IconName; keys: string }[] = [
-  { value: "left", label: "왼쪽 정렬", icon: "alignLeft", keys: "Control+Shift+L" },
-  { value: "center", label: "가운데 정렬", icon: "alignCenter", keys: "Control+Shift+E" },
-  { value: "right", label: "오른쪽 정렬", icon: "alignRight", keys: "Control+Shift+R" },
-  { value: "justify", label: "양쪽 정렬", icon: "alignJustify", keys: "Control+Shift+J" },
-];
-
-type ToolButtonProps = {
-  label: string;
-  /** 있으면 글자 대신 아이콘을 보이고, label은 이름(aria-label)으로 쓴다. */
-  icon?: IconName;
-  /** 단축키(aria-keyshortcuts 형식) */
-  keys?: string;
-  /** 마크다운 단축 입력 안내 */
-  hint?: string;
-  pressed?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-};
-
-function ToolButton({ label, icon, keys, hint, pressed, disabled, onClick }: ToolButtonProps) {
-  const tip = keys ? keys.replace(/Control/g, "Ctrl") : hint ? `입력: ${hint}` : undefined;
-  return (
-    <button
-      type="button"
-      className="editor-button"
-      aria-label={icon ? label : undefined}
-      aria-pressed={pressed}
-      aria-keyshortcuts={keys}
-      title={tip ? `${label} (${tip})` : undefined}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {icon ? <Icon name={icon} /> : label}
-    </button>
   );
 }
