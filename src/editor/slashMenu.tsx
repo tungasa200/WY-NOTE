@@ -36,7 +36,8 @@ function buildItems({ canInsertImage, pickImage }: SlashOptions, editor: Editor)
     { title: "글머리 목록", group: "기본 블록", icon: "list", hint: "-", keywords: ["bullet", "list", "ul"], run: (e, r) => block(e, r).toggleBulletList().run() },
     { title: "번호 목록", group: "기본 블록", icon: "olist", hint: "1.", keywords: ["number", "ordered", "list", "ol"], run: (e, r) => block(e, r).toggleOrderedList().run() },
     { title: "체크리스트", group: "기본 블록", icon: "todo", hint: "[]", keywords: ["todo", "task", "check", "할 일"], run: (e, r) => block(e, r).toggleTaskList().run() },
-    { title: "코드", group: "더 보기", icon: "code", description: "고정폭, 문법 강조", hint: "```", keywords: ["code", "코드 블록"], run: (e, r) => block(e, r).setCodeBlock().run() },
+    { title: "인용", group: "기본 블록", icon: "quote", description: "인용문", hint: ">", keywords: ["quote", "blockquote", "인용"], run: (e, r) => block(e, r).toggleBlockquote().run() },
+    { title: "코드", group: "더 보기", icon: "codeBlock", description: "고정폭, 문법 강조", hint: "```", keywords: ["code", "코드 블록"], run: (e, r) => block(e, r).setCodeBlock().run() },
   ];
   if (!editor.isActive("table")) {
     items.push({
@@ -61,6 +62,7 @@ function buildItems({ canInsertImage, pickImage }: SlashOptions, editor: Editor)
       },
     });
   }
+  items.push({ title: "구분선", group: "더 보기", icon: "rule", description: "가로줄", hint: "---", keywords: ["hr", "divider", "line", "선", "구분"], run: (e, r) => block(e, r).setHorizontalRule().run() });
   return items;
 }
 

@@ -1,4 +1,32 @@
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Code, GripVertical, Image, Link, List, ListOrdered, Plus, SquareCheck, Table, Type } from "lucide-react";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Code,
+  Ellipsis,
+  GripVertical,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  Minus,
+  Plus,
+  Redo2,
+  SquareCheck,
+  SquareCode,
+  Strikethrough,
+  Table,
+  TextQuote,
+  Type,
+  Underline,
+  Undo2,
+} from "lucide-react";
 
 // 아이콘은 lucide-react(사용자 결정). 쓰는 것만 import해 번들에 그것만 들어간다.
 const ICONS = {
@@ -7,6 +35,7 @@ const ICONS = {
   olist: ListOrdered,
   todo: SquareCheck,
   code: Code,
+  codeBlock: SquareCode,
   table: Table,
   image: Image,
   plus: Plus,
@@ -16,6 +45,18 @@ const ICONS = {
   alignCenter: AlignCenter,
   alignRight: AlignRight,
   alignJustify: AlignJustify,
+  undo: Undo2,
+  redo: Redo2,
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+  quote: TextQuote,
+  bold: Bold,
+  italic: Italic,
+  underline: Underline,
+  strike: Strikethrough,
+  rule: Minus,
+  more: Ellipsis,
 };
 
 export type IconName = keyof typeof ICONS;
