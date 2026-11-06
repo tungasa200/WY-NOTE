@@ -10,7 +10,6 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import FileHandler from "@tiptap/extension-file-handler";
 import TextAlign from "@tiptap/extension-text-align";
 import { redoDepth, undoDepth } from "@tiptap/pm/history";
@@ -26,6 +25,7 @@ import { Icon, type IconName } from "./icons";
 import { EmptyParagraphHint } from "./placeholder";
 import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from "./uploadPlaceholder";
 import { PasteGuard } from "./paste";
+import { CodeBlock } from "./codeBlock";
 import { useLinkMenu } from "./LinkMenu";
 import "highlight.js/styles/github.css";
 import "./Editor.css";
@@ -68,7 +68,7 @@ type ImageHandlers = {
 
 // 렌더마다 새로 만들면 useEditor가 옵션이 바뀐 것으로 보고 setOptions를 다시 부르므로 편집기마다 한 번만 만든다.
 // 바뀔 수 있는 값(콜백)은 handlers 안에서 ref로 읽는다.
-const createExtensions = (handlers: ImageHandlers) => [
+const createExtensions = (handlers: ImageHandlers, notify: (message: string) => void) => [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
     codeBlock: false,
@@ -89,7 +89,7 @@ const createExtensions = (handlers: ImageHandlers) => [
   // Tab은 2칸(S-06).
   // 문단·제목 정렬. 단축키는 확장 기본값(Ctrl+Shift+L/E/R/J).
   TextAlign.configure({ types: ["heading", "paragraph"] }),
-  CodeBlockLowlight.configure({ lowlight, enableTabIndentation: true, tabSize: 2 }),
+  CodeBlock.configure({ lowlight, enableTabIndentation: true, tabSize: 2, onNotify: notify }),
   WyImage,
   // 형식은 여기서 거르지 않는다. 허용 밖 파일도 받아서 넣지 않은 이유를 알린다(ImageBatch.check).
   FileHandler.configure({
@@ -182,7 +182,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       notify(batch.message());
     },
   }));
-  const [extensions] = useState(() => createExtensions(handlers));
+  const [extensions] = useState(() => createExtensions(handlers, notify));
 
   const editor = useEditor({
     extensions,

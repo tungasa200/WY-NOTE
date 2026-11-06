@@ -92,7 +92,9 @@ export function BlockHandle({ editor, wrapRef }: { editor: Editor; wrapRef: RefO
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
-    const el = pos === null ? null : editor.view.nodeDOM(pos);
+    const dom = pos === null ? null : editor.view.nodeDOM(pos);
+    // 코드 블록은 노드 뷰 틀 안의 pre가 줄 높이·위 여백을 가진다(P6-4).
+    const el = dom instanceof HTMLElement ? (dom.querySelector(":scope > .editor-code > pre") ?? dom) : dom;
     if (!wrap || !(el instanceof HTMLElement)) {
       setPlace(null);
       return;
