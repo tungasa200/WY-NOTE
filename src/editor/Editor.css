@@ -98,51 +98,6 @@
   flex: 1;
   outline: none;
   overflow-wrap: anywhere;
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
-}
-
-/* 블록 사이 2px, 제목 위는 더 띄운다(S-06). 브라우저 기본 위아래 여백(1em)은 지운다. */
-.editor-body :is(p, ul, ol, pre, blockquote, h1, h2, h3) {
-  margin-block: 0;
-}
-
-.editor-body > * + *,
-.editor-body li + li,
-.editor-body li > * + :is(p, ul, ol, pre, blockquote),
-.editor-body li > div > * + * {
-  margin-top: var(--space-0-5);
-}
-
-/* 긴 문단이 이어지면 2px로는 경계가 안 보여 문단끼리만 더 띄운다(design 2026-11-04). */
-.editor-body > p + p {
-  margin-top: var(--space-2);
-}
-
-.editor-body > :is(h1, h2, h3) {
-  line-height: var(--leading-tight);
-}
-
-.editor-body > h1 {
-  margin-top: var(--space-8);
-  font-size: var(--text-h1);
-  font-weight: var(--weight-bold);
-}
-
-.editor-body > h2 {
-  margin-top: var(--space-6);
-  font-size: var(--text-h2);
-  font-weight: var(--weight-bold);
-}
-
-.editor-body > h3 {
-  margin-top: var(--space-5);
-  font-size: var(--text-h3);
-  font-weight: var(--weight-semibold);
-}
-
-.editor-body > :first-child {
-  margin-top: 0;
 }
 
 /* 글 쓰는 동안 편집 영역 전체에 포커스 테두리를 두르지 않는다(P5-1). 전역 :focus-visible보다 앞서게 선택자를 높인다. */
@@ -177,6 +132,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
+}
+
+.editor-body ul[data-type="taskList"] li + li {
+  margin-top: 1em;
 }
 
 /* 체크박스를 글 첫 줄 높이(1lh)의 가운데에 둔다. 문단 위 여백은 li 사이 간격으로 옮긴다(P5-1). */
@@ -238,8 +197,6 @@
   padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--color-border-strong);
   font-size: var(--text-md);
-  /* 본문 줄 간격(1.7)을 물려받지 않고 표는 지금 밀도를 지킨다. */
-  line-height: var(--leading-ui);
   vertical-align: top;
 }
 
