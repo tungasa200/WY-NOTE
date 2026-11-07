@@ -185,7 +185,8 @@ export function Toolbar({
       const padRight = parseFloat(st.paddingRight) - cover;
       if (next !== cover) {
         cover = next;
-        bar.style.setProperty("--toolbar-cover", `${next}px`);
+        // 찾기 막대(S-14)도 같은 값을 쓰게 편집기 상자에 적는다.
+        bar.parentElement?.style.setProperty("--toolbar-cover", `${next}px`);
       }
       setAvail(bar.clientWidth - parseFloat(st.paddingLeft) - padRight - next);
     };

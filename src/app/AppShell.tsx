@@ -7,6 +7,7 @@ import { api, errorReason } from "../api";
 import { AiPanel } from "../ai/AiPanel";
 import { createEditorTarget } from "../ai/editorTarget";
 import type { EditorInstance } from "../editor/Editor";
+import { findSession, revealFirstMatch, sendFindCommand } from "../editor/find";
 import { SearchPanel, type RecentPage } from "../features/search/SearchPanel";
 import { TrashPanel } from "../features/trash/TrashPanel";
 import { ConfirmDialog } from "../lib/ConfirmDialog";
@@ -20,7 +21,7 @@ import { CloseSaveDialog } from "./CloseSaveDialog";
 import { PageToc } from "./PageToc";
 import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
-import { closeToast, pushToast, Toast, type ToastData, type ToastQueue } from "./Toast";
+import { closeToast, pushToast, Toast, withdrawToast, type ToastData, type ToastQueue } from "./Toast";
 import "./AppShell.css";
 
 type View = "page" | "trash" | "settings";
@@ -383,6 +384,25 @@ export function AppShell() {
     });
   };
 
+  // 검색 결과로 연 페이지: 본문으로 포커스를 옮기고(검색창은 연 곳으로 돌려주지 않는다),
+  // 찾는 말이 있으면 첫 일치로 커서를 옮겨 1.5초 강조, 본문에 없으면(제목에만 일치) 맨 위(F-04, S-05).
+  const pendingReveal = useRef<{ id: PageId; query: string } | null>(null);
+  const revealPending = useCallback((ed: EditorInstance) => {
+    const p = pendingReveal.current;
+    if (!p || p.id !== openIdRef.current || ed.isDestroyed) return;
+    pendingReveal.current = null;
+    // 편집기가 자동 포커스(본문 끝)를 마친 뒤에 한다.
+    const reveal = () => {
+      ed.view.dom.focus();
+      if (p.query && !revealFirstMatch(ed, p.query) && contentRef.current) contentRef.current.scrollTop = 0;
+    };
+    if (ed.isInitialized) reveal();
+    else ed.once("create", reveal);
+  }, []);
+  useEffect(() => {
+    if (editor) revealPending(editor);
+  }, [editor, revealPending]);
+
   // 검색어를 보낼 때 저장 대기 중인 내용을 먼저 저장한다(방금 입력한 내용도 찾게, 결정 spec-details).
   const searchSaved = useCallback(
     async (query: string) => {
@@ -401,6 +421,8 @@ export function AppShell() {
       // 아직 읽는 중인 페이지 열기는 버린다(늦게 도착해 이 화면 뒤에서 열리지 않게).
       openSeq.current++;
       if (openIdRef.current !== null) void saver.flush(openIdRef.current);
+      // 휴지통·설정으로 가면 찾기 막대를 닫는다(S-14). 페이지끼리 옮길 때는 열린 채로 둔다.
+      findSession.open = false;
       setPage(null);
       setView(to);
     },
@@ -420,7 +442,10 @@ export function AppShell() {
       const action = {
         KeyK: () => setSearchOpen(true),
         // Ctrl+F: WebView2 찾기 막대를 열면 닫은 뒤에도 한글 입력기 연결이 막대에 남는다(P7-1).
-        KeyF: () => setSearchOpen(true),
+        // 열린 페이지(찾기 막대가 있음)에서는 앱의 찾기 막대, 그 밖의 화면에서는 검색 창(S-14).
+        KeyF: () => sendFindCommand("find") || setSearchOpen(true),
+        // Ctrl+H: 바꾸기를 펼친 찾기 막대. 페이지가 아니면 기본 동작(기록 창)만 막는다.
+        KeyH: () => sendFindCommand("replace"),
         KeyN: () => void createPage(null),
         Backslash: () => updateLayout((l) => ({ ...l, sidebar: !l.sidebar })),
         KeyJ: () => updateLayout((l) => ({ ...l, ai: !l.ai })),
@@ -435,12 +460,13 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [createPage, openSettings]);
 
-  // 찾기 다음·이전(F3·Shift+F3·Ctrl+G·Ctrl+Shift+G)도 WebView2 찾기 막대를 연다(P7-1). 지금은 막기만 하고,
-  // 입력칸 등에서 stopPropagation해도 새지 않게 캡처 단계에서 본다.
+  // 찾기 다음·이전(F3·Shift+F3·Ctrl+G·Ctrl+Shift+G)은 WebView2 찾기 막대 대신 앱 찾기 막대로 보낸다(P7-1, S-14).
+  // 입력칸 등에서 stopPropagation해도 새지 않게 캡처 단계에서 본다. 페이지가 아니면 막기만 한다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey) return;
-      if (e.code === "F3" ? !e.ctrlKey : e.ctrlKey && e.code === "KeyG") e.preventDefault();
+      if (e.altKey || !(e.code === "F3" ? !e.ctrlKey : e.ctrlKey && e.code === "KeyG")) return;
+      e.preventDefault();
+      if (!document.querySelector("dialog[open], [role='menu']")) sendFindCommand(e.shiftKey ? "prev" : "next");
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -652,6 +678,7 @@ export function AppShell() {
                 onContentChange={(doc: JSONContent) => saver.setContent(page.id, doc)}
                 onEditor={onEditor}
                 onNotify={notify}
+                onToast={setToast}
               />
             ) : null}
           </div>
@@ -696,16 +723,17 @@ export function AppShell() {
             return n ? [{ pageId: id, title: n.title }] : [];
           })}
           pathOf={(id) => pathLabel(ancestors(ix, id))}
-          onOpenPage={async (id) => {
-            // 첫 일치 위치로 스크롤·강조(S-05)는 편집기 쪽 기능이 생기면 query로 붙인다.
+          onOpenPage={async (id, query) => {
             setSearchOpen(false);
+            const same = openIdRef.current === id;
+            // 다른 페이지면 새 편집기가 붙을 때(위 [editor] 효과) 연다. 같은 페이지면 편집기가 그대로라 바로 연다.
+            pendingReveal.current = { id, query };
             await openPage(id);
-            // 연 페이지의 본문으로 포커스를 옮긴다(검색창은 연 곳으로 돌려주지 않는다).
-            // 열지 못했으면(실패·다른 열기가 앞섬) 트리의 열린 페이지로 돌린다.
-            requestAnimationFrame(() => {
-              if (openIdRef.current === id) document.querySelector<HTMLElement>(".editor-body")?.focus();
-              else treeRef.current?.focus(openIdRef.current);
-            });
+            if (openIdRef.current !== id) {
+              // 열지 못했으면(실패·다른 열기가 앞섬) 트리의 열린 페이지로 돌린다.
+              pendingReveal.current = null;
+              requestAnimationFrame(() => treeRef.current?.focus(openIdRef.current));
+            } else if (same && editor) revealPending(editor);
           }}
           onClose={() => setSearchOpen(false)}
         />
@@ -724,7 +752,14 @@ export function AppShell() {
 
       {/* 읽기 프로그램은 미리 있던 라이브 영역의 바뀐 내용만 읽으므로 틀은 늘 둔다. */}
       <div className="toast-region" role="status">
-        {toast && <Toast key={toast.id} data={toast} onClose={() => setToasts((q) => closeToast(q, toast.id))} />}
+        {toast && (
+          <Toast
+            key={toast.id}
+            data={toast}
+            onClose={() => setToasts((q) => closeToast(q, toast.id))}
+            onWithdraw={() => setToasts((q) => withdrawToast(q, toast.id))}
+          />
+        )}
       </div>
     </div>
   );

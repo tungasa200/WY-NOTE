@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
+import { stickyBottom } from "./find";
 
 /** 커서가 든 표의 시작 위치. 편집 영역에 포커스가 없거나 표 밖이면 null. */
 function cursorTable(editor: Editor): number | null {
@@ -63,9 +64,9 @@ export function TableTools({ editor, wrapRef }: { editor: Editor; wrapRef: RefOb
       const box = el.getBoundingClientRect();
       const wrapBox = wrap.getBoundingClientRect();
       const port = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
-      // 위에 붙는 편집기 도구 막대(sticky)에 가려진 곳은 보이는 영역에서 뺀다.
-      const sticky = wrap.parentElement?.querySelector(".editor-toolbar")?.getBoundingClientRect();
-      const view = { top: Math.max(port.top, sticky?.bottom ?? port.top), bottom: port.bottom };
+      // 위에 붙는 편집기 도구 막대·찾기 막대(sticky)에 가려진 곳은 보이는 영역에서 뺀다.
+      const root = wrap.parentElement;
+      const view = { top: root ? stickyBottom(root, port.top) : port.top, bottom: port.bottom };
       const h = bar.offsetHeight;
       const below = box.bottom + GAP;
       const above = box.top - GAP - h;

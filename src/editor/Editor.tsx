@@ -25,6 +25,9 @@ import { UploadPlaceholder, addUploadPlaceholder, removeUploadPlaceholder } from
 import { PasteGuard } from "./paste";
 import { CodeBlock } from "./codeBlock";
 import { useLinkMenu } from "./LinkMenu";
+import { FindExtension } from "./find";
+import { FindBar } from "./FindBar";
+import type { ToastData } from "../app/Toast";
 import "highlight.js/styles/github.css";
 import "./Editor.css";
 
@@ -52,6 +55,8 @@ type EditorProps = {
   onEditor?: (editor: TiptapEditor, attached: boolean) => void;
   /** 알림 문구(S-13). 앱 토스트로 띄운다. */
   onNotify?: (message: string) => void;
+  /** 동작 버튼이 있는 알림(찾기 막대 모두 바꾸기의 실행 취소). */
+  onToast?: (t: ToastData) => void;
 };
 
 type ImageHandlers = {
@@ -105,6 +110,7 @@ const createExtensions = (handlers: ImageHandlers, notify: (message: string) => 
   }),
   UploadPlaceholder,
   EmptyParagraphHint,
+  FindExtension,
   BlockMove,
   SlashCommand.configure({ canInsertImage: handlers.canInsert, pickImage: handlers.pick }),
   PasteGuard.configure({
@@ -116,7 +122,7 @@ const EDITOR_PROPS = {
   attributes: { class: "editor-body", "aria-label": "노트 본문", spellcheck: "false" },
 };
 
-export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor, onNotify }: EditorProps) {
+export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor, onNotify, onToast }: EditorProps) {
   const uploadRef = useRef(onImageUpload);
   uploadRef.current = onImageUpload;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,6 +206,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
   return (
     <div className="editor">
       <Toolbar editor={editor} canInsertImage={!!onImageUpload} onPickImage={handlers.pick} />
+      <FindBar editor={editor} onToast={onToast} />
       <input
         ref={fileInputRef}
         type="file"

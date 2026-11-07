@@ -26,6 +26,129 @@
   background: var(--color-bg);
 }
 
+/* 페이지 안 찾기 막대(S-14): 도구 막대 바로 아래 고정 머리 두 번째 줄. 폭·좌우 끝은 도구 막대와 같다.
+   접힘 39px(30 + 4·2 + 선 1), 바꾸기 펼침 73px(30·2 + 4·3 + 선 1). */
+.find-bar {
+  position: sticky;
+  top: calc(var(--control-height) + 2 * var(--space-1) + 1px);
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  --toolbar-bleed: calc(50cqi - 50%);
+  margin-inline: calc(-1 * var(--toolbar-bleed));
+  padding: var(--space-1) calc(var(--space-4) + var(--toolbar-cover, 0px)) var(--space-1) var(--toolbar-bleed);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-bg);
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* 바꾸기 줄은 첫 줄 입력칸 왼쪽 끝(펼치기 30 + 4)에 맞춘다. */
+.find-replace {
+  padding-left: calc(var(--control-height) + var(--space-1));
+}
+
+.find-row > .editor-button:first-child {
+  margin-right: calc(var(--space-1) - var(--space-2));
+}
+
+.find-bar .editor-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--control-height);
+  padding: 0;
+}
+
+/* search·text 입력칸의 기본 상자 계산이 달라 너비가 어긋나지 않게 맞춘다. */
+.find-input {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 64px;
+  max-width: 320px;
+  height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+/* 지우기(×) 단추는 두지 않는다(Esc가 닫기라 헷갈린다). */
+.find-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.find-count {
+  flex: none;
+  min-width: 40px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.find-buttons {
+  display: flex;
+  flex: none;
+  gap: var(--space-0-5);
+}
+
+.find-close {
+  margin-left: auto;
+}
+
+/* 일치 강조(본문 꾸밈). .find-flash는 검색 결과로 연 자리의 1.5초 강조(S-05, 깜빡이지 않는다). 줄 높이를 바꾸지 않게 안쪽 여백 없음. 안의 코드 강조·링크 색은 덮는다(밑줄은 남긴다). */
+.find-match,
+.find-flash {
+  border-radius: 2px;
+  background: var(--color-mark);
+  color: var(--color-text);
+}
+
+.find-match-current {
+  background: var(--color-mark-current);
+  color: var(--color-mark-current-text);
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+
+.find-match *,
+.find-flash * {
+  color: inherit;
+}
+
+@media (forced-colors: active) {
+  .find-match,
+  .find-flash {
+    outline: 1px solid CanvasText;
+  }
+
+  .find-match-current {
+    outline: 0;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .editor-toolbar-group {
   display: flex;
   flex: none;

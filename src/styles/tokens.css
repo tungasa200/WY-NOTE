@@ -53,6 +53,8 @@
   --color-success: #2e7d4f;
   --color-success-soft: #e5f2ea;
   --color-mark: #ffe9a8;             /* 검색 일치 강조. 안의 글자는 --color-text */
+  --color-mark-current: #f2a93b;     /* 찾기 막대 지금 일치(S-14) */
+  --color-mark-current-text: #2a2926;
 
   /* ── 색: 코드 문법 강조(lowlight/hljs 클래스에 연결) ── */
   --code-text: #2a2926;
@@ -186,6 +188,8 @@
     --color-success: #7cc79a;
     --color-success-soft: #1f3327;
     --color-mark: #5a4a12;
+    --color-mark-current: #e2b75c;
+    --color-mark-current-text: #1c1c1a;
     --code-text: #e8e6e1;
     --code-comment: #a3a098;
     --code-keyword: #d49be0;
@@ -233,6 +237,8 @@
   --color-success: #7cc79a;
   --color-success-soft: #1f3327;
   --color-mark: #5a4a12;
+  --color-mark-current: #e2b75c;
+  --color-mark-current-text: #1c1c1a;
   --code-text: #e8e6e1;
   --code-comment: #a3a098;
   --code-keyword: #d49be0;
