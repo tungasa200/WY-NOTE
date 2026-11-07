@@ -2,6 +2,7 @@
 // 새 라이브러리 없이 편집기 문서의 heading 노드만 읽는다(pm 결정).
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import type { EditorInstance } from "../editor/Editor";
+import { stickyBottom } from "../editor/find";
 import "./PageToc.css";
 
 type Heading = { pos: number; level: number; text: string };
@@ -88,12 +89,11 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
     [editor],
   );
 
-  /** 도구 막대(sticky) 아래, 보이는 편집 영역의 위 끝(화면 좌표). */
+  /** 도구 막대(sticky, 찾기 막대가 열렸으면 그 아래 끝) 아래, 보이는 편집 영역의 위 끝(화면 좌표). */
   const viewTop = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return 0;
-    const bar = scroller.querySelector(".editor-toolbar")?.getBoundingClientRect();
-    return Math.max(scroller.getBoundingClientRect().top, bar?.bottom ?? 0);
+    return stickyBottom(scroller, scroller.getBoundingClientRect().top);
   }, [scrollerRef]);
 
   // 띠·목록 자리. 보이는 오른쪽 끝 = 스크롤 막대 왼쪽, AI 패널이 겹쳐 떠 있으면 그 왼쪽 경계.
@@ -122,6 +122,19 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
     ro.observe(area);
     const bar = scroller.querySelector(".editor-toolbar");
     if (bar) ro.observe(bar);
+    // 찾기 막대(S-14)는 열고 닫을 때 생기고 없어진다. 생기면 높이(바꾸기 펼침)도 지켜본다.
+    let find: Element | null = null;
+    const watchFind = () => {
+      const next = bar?.parentElement?.querySelector(":scope > .find-bar") ?? null;
+      if (next === find) return;
+      if (find) ro.unobserve(find);
+      find = next;
+      if (find) ro.observe(find);
+      measure();
+    };
+    watchFind();
+    const mo = new MutationObserver(watchFind);
+    if (bar?.parentElement) mo.observe(bar.parentElement, { childList: true });
     // 도구 막대는 sticky라 붙기 전에는 스크롤에 따라 아래 끝이 움직인다. 붙은 뒤에는 값이 같아 다시 그리지 않는다.
     let frame = 0;
     const onScroll = () => {
@@ -134,6 +147,7 @@ export function PageToc({ editor, scrollerRef, aiOpen }: Props) {
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       ro.disconnect();
+      mo.disconnect();
       cancelAnimationFrame(frame);
       scroller.removeEventListener("scroll", onScroll);
     };

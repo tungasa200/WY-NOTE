@@ -5,6 +5,9 @@ import {
   AlignRight,
   Bold,
   Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
   Code,
   Copy,
   Ellipsis,
@@ -20,6 +23,8 @@ import {
   Minus,
   Plus,
   Redo2,
+  Replace,
+  ReplaceAll,
   SquareCheck,
   SquareCode,
   Strikethrough,
@@ -28,6 +33,7 @@ import {
   Type,
   Underline,
   Undo2,
+  X,
 } from "lucide-react";
 
 // 아이콘은 lucide-react(사용자 결정). 쓰는 것만 import해 번들에 그것만 들어간다.
@@ -61,6 +67,12 @@ const ICONS = {
   strike: Strikethrough,
   rule: Minus,
   more: Ellipsis,
+  chevronUp: ChevronUp,
+  chevronDown: ChevronDown,
+  chevronRight: ChevronRight,
+  replace: Replace,
+  replaceAll: ReplaceAll,
+  close: X,
 };
 
 export type IconName = keyof typeof ICONS;
