@@ -435,6 +435,17 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [createPage, openSettings]);
 
+  // 찾기 다음·이전(F3·Shift+F3·Ctrl+G·Ctrl+Shift+G)도 WebView2 찾기 막대를 연다(P7-1). 지금은 막기만 하고,
+  // 입력칸 등에서 stopPropagation해도 새지 않게 캡처 단계에서 본다.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey) return;
+      if (e.code === "F3" ? !e.ctrlKey : e.ctrlKey && e.code === "KeyG") e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+
   // 릴리스에서는 새로 고침을 막는다(편집 상태가 날아간다). 확대(Ctrl+±·휠)는 막지 않는다.
   // WebView2 기본 오른쪽 클릭 메뉴에도 '새로 고침'이 있어, 글을 고치는 곳(편집기·입력칸) 밖에서는 띄우지 않는다.
   useEffect(() => {
