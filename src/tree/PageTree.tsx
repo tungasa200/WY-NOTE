@@ -315,7 +315,8 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (value: str
       onChange={(e) => setValue(e.target.value)}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
-        e.stopPropagation();
+        // Ctrl+F는 전역 단축키까지 보내 WebView2 찾기 막대를 막는다(P7-1).
+        if (!(e.ctrlKey && e.code === "KeyF")) e.stopPropagation();
         if (e.key === "Enter") finish(value);
         else if (e.key === "Escape") finish(null);
       }}

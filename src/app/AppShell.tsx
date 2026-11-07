@@ -419,6 +419,8 @@ export function AppShell() {
       // e.key는 한글 입력 상태에서 자모가 될 수 있어 키 위치(e.code)로 본다.
       const action = {
         KeyK: () => setSearchOpen(true),
+        // Ctrl+F: WebView2 찾기 막대를 열면 닫은 뒤에도 한글 입력기 연결이 막대에 남는다(P7-1).
+        KeyF: () => setSearchOpen(true),
         KeyN: () => void createPage(null),
         Backslash: () => updateLayout((l) => ({ ...l, sidebar: !l.sidebar })),
         KeyJ: () => updateLayout((l) => ({ ...l, ai: !l.ai })),
