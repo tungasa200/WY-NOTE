@@ -58,7 +58,7 @@
 
   /* ── 색: 코드 문법 강조(lowlight/hljs 클래스에 연결) ── */
   --code-text: #2a2926;
-  --code-comment: #6e6b64;
+  --code-comment: #6a675f;           /* 대비 4.95 / bg-sunken, 4.75 / 선택된 블록 accent-soft (P7-5 design 기준) */
   --code-keyword: #8a3b8f;
   --code-string: #2a7348;            /* 대비 5.05 / bg-sunken (P7-5 design 기준, --color-success와 따로) */
   --code-number: #a14a00;
