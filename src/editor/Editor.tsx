@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   EditorContent,
   useEditor,
@@ -121,17 +121,19 @@ const EDITOR_PROPS = {
   attributes: { class: "editor-body", "aria-label": "노트 본문", spellcheck: "false" },
 };
 
-export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor, onNotify, onToast }: EditorProps) {
-  const uploadRef = useRef(onImageUpload);
-  uploadRef.current = onImageUpload;
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const notifyRef = useRef(onNotify);
-  notifyRef.current = onNotify;
-  // 한 번만 만드는 handlers 안에서도 지금 콜백을 부르게 ref로 읽는다. 빈 문구는 띄우지 않는다.
-  const [notify] = useState(() => (message: string) => void (message && notifyRef.current?.(message)));
-
-  const [handlers] = useState<ImageHandlers>(() => ({
+/**
+ * 편집기마다 한 번 만들어 편집기(확장)에 붙는 콜백. 바뀌는 값은 ref로만 읽는다.
+ * 컴포넌트 안에서 만들면 그 렌더의 다른 클로저와 스코프를 나눠, 한 클로저라도 prop(onChange 등)을 잡으면 함께 붙잡는다.
+ * prop → 앱 렌더 → 직전 편집기로 이어져 페이지를 옮길 때마다 편집기가 풀리지 않았다(P7-9). 그래서 모듈 함수로 둔다.
+ */
+function createHandlers(
+  uploadRef: RefObject<EditorProps["onImageUpload"]>,
+  fileInputRef: RefObject<HTMLInputElement | null>,
+  notifyRef: RefObject<EditorProps["onNotify"]>,
+) {
+  // 빈 문구는 띄우지 않는다.
+  const notify = (message: string) => void (message && notifyRef.current?.(message));
+  const handlers: ImageHandlers = {
     canInsert: () => !!uploadRef.current,
     pick: () => fileInputRef.current?.click(),
     insert: async (editor, all, pos, remote = 0) => {
@@ -184,7 +186,21 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
       }
       notify(batch.message());
     },
-  }));
+  };
+  return { notify, handlers };
+}
+
+export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus = "end", onEditor, onNotify, onToast }: EditorProps) {
+  const uploadRef = useRef(onImageUpload);
+  uploadRef.current = onImageUpload;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const notifyRef = useRef(onNotify);
+  notifyRef.current = onNotify;
+  // 편집기 안 클로저는 prop을 직접 잡지 않고 ref로 읽는다(P7-9, createHandlers 설명).
+  const changeRef = useRef(onChange);
+  changeRef.current = onChange;
+  const [{ notify, handlers }] = useState(() => createHandlers(uploadRef, fileInputRef, notifyRef));
   const [extensions] = useState(() => createExtensions(handlers, notify));
 
   const editor = useEditor({
@@ -192,7 +208,7 @@ export function Editor({ content = EMPTY_DOC, onChange, onImageUpload, autofocus
     content,
     autofocus,
     editorProps: EDITOR_PROPS,
-    onUpdate: ({ editor }) => onChange?.(editor.getJSON()),
+    onUpdate: ({ editor }) => changeRef.current?.(editor.getJSON()),
   });
   const onEditorRef = useRef(onEditor);
   onEditorRef.current = onEditor;
