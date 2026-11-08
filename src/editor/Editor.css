@@ -34,9 +34,11 @@
   z-index: var(--z-sticky);
   /* 두 줄이 열을 같이 써서 찾기 칸·바꿀 말 칸의 양 끝이 세로로 맞는다(P7-5).
      열: 펼치기 | 입력칸(64~320) | 개수 | 이전·다음 | 남는 폭 | 닫기. 사이 간격은 항목 왼쪽 여백으로 준다.
-     개수 열은 max-content: auto면 좁을 때 min-width 40까지 줄어 '1 / 1,000+'가 버튼 위로 넘친다. */
+     개수 열은 max-content: auto면 좁을 때 min-width 40까지 줄어 '1 / 1,000+'가 버튼 위로 넘친다.
+     입력칸은 56~320(design S-14). 좁으면 개수를 두 줄로 접어(아래 @container) 닫기가 막대 밖으로 밀리지 않게 한다. */
   display: grid;
-  grid-template-columns: var(--control-height) minmax(calc(64px + var(--space-1)), calc(320px + var(--space-1))) max-content auto 1fr auto;
+  grid-template-columns: var(--control-height) minmax(calc(56px + var(--space-1)), calc(320px + var(--space-1))) max-content auto 1fr auto;
+  container: find-bar / inline-size;
   row-gap: var(--space-1);
   --toolbar-bleed: calc(50cqi - 50%);
   margin-inline: calc(-1 * var(--toolbar-bleed));
@@ -102,8 +104,21 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  line-height: 14px;
   text-align: right;
+}
+
+/* '{위치} /'와 '{총수}'는 각각 한 덩어리라 '/' 뒤에서만 줄이 바뀐다. */
+.find-count > span {
+  display: inline-block;
   white-space: nowrap;
+}
+
+/* 막대 안쪽 < 292px(고정 150 + 입력칸 56 + 가장 긴 개수 85 + 1)일 때만 긴 개수를 두 줄(14px·2 ≤ 30)로 접는다. */
+@container find-bar (width < 292px) {
+  .find-count {
+    max-width: 46px;
+  }
 }
 
 .find-buttons {

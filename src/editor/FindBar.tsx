@@ -271,7 +271,16 @@ export function FindBar({ editor, onToast }: { editor: Editor; onToast?: (t: Toa
   const none = !query || !found.total;
   const o = over(found);
   const at = o.pos ? `${LIMIT}+` : num(found.current + 1);
-  const count = !query ? "" : none ? "없음" : `${at} / ${o.total ? `${LIMIT}+` : num(found.total)}`;
+  // 좁은 막대에서 '/' 뒤에서만 두 줄로 접히게 두 조각으로 둔다(design S-14).
+  const count = !query ? (
+    ""
+  ) : none ? (
+    "없음"
+  ) : (
+    <>
+      <span>{at} /</span> <span>{o.total ? `${LIMIT}+` : num(found.total)}</span>
+    </>
+  );
 
   return (
     <>
