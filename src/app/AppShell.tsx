@@ -22,6 +22,7 @@ import { PageToc } from "./PageToc";
 import { PageView, type OpenPage } from "./PageView";
 import { SettingsView } from "./SettingsView";
 import { closeToast, pushToast, Toast, withdrawToast, type ToastData, type ToastQueue } from "./Toast";
+import { pruneUndo } from "./undoKeep";
 import "./AppShell.css";
 
 type View = "page" | "trash" | "settings";
@@ -108,6 +109,11 @@ export function AppShell() {
   const ix = useMemo(() => indexTree(nodes ?? []), [nodes]);
   const ixRef = useRef(ix);
   ixRef.current = ix;
+  // 휴지통으로 간 페이지(트리에서 빠진 페이지)의 실행 취소 기록은 버린다(pm 결정).
+  // 열린 페이지를 옮기면 편집기가 이 렌더에서 떨어지며 기록을 맡기므로, 그 뒤에 도는 effect에서 거른다.
+  useEffect(() => {
+    if (nodes) pruneUndo((id) => ix.byId.has(id));
+  }, [nodes, ix]);
   const treeRef = useRef<PageTreeHandle>(null);
   const openIdRef = useRef(openId);
   openIdRef.current = openId;
