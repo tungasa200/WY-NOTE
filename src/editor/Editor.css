@@ -32,9 +32,12 @@
   position: sticky;
   top: calc(var(--control-height) + 2 * var(--space-1) + 1px);
   z-index: var(--z-sticky);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  /* 두 줄이 열을 같이 써서 찾기 칸·바꿀 말 칸의 양 끝이 세로로 맞는다(P7-5).
+     열: 펼치기 | 입력칸(64~320) | 개수 | 이전·다음 | 남는 폭 | 닫기. 사이 간격은 항목 왼쪽 여백으로 준다.
+     개수 열은 max-content: auto면 좁을 때 min-width 40까지 줄어 '1 / 1,000+'가 버튼 위로 넘친다. */
+  display: grid;
+  grid-template-columns: var(--control-height) minmax(calc(64px + var(--space-1)), calc(320px + var(--space-1))) max-content auto 1fr auto;
+  row-gap: var(--space-1);
   --toolbar-bleed: calc(50cqi - 50%);
   margin-inline: calc(-1 * var(--toolbar-bleed));
   padding: var(--space-1) calc(var(--space-4) + var(--toolbar-cover, 0px)) var(--space-1) var(--toolbar-bleed);
@@ -43,25 +46,30 @@
 }
 
 .find-row {
-  display: flex;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
 }
 
-/* 바꾸기 줄은 첫 줄 입력칸 왼쪽 끝(펼치기 30 + 4)에 맞춘다. */
-.find-replace {
-  padding-left: calc(var(--control-height) + var(--space-1));
+/* 펼치기와 입력칸 사이 4px(.find-input), 나머지 사이 8px */
+.find-row > .find-input ~ * {
+  margin-left: var(--space-2);
 }
 
-.find-row > .editor-button:first-child {
-  margin-right: calc(var(--space-1) - var(--space-2));
+/* 바꾸기 줄의 버튼은 첫 줄 개수 칸 자리부터 */
+.find-replace > .find-buttons {
+  grid-column: 3 / span 2;
+}
+
+/* 닫기는 남는 폭 다음 마지막 열(오른쪽 끝) */
+.find-close {
+  grid-column: -2;
 }
 
 .find-bar .editor-button {
   display: grid;
   place-items: center;
-  flex: none;
   width: var(--control-height);
   padding: 0;
 }
@@ -69,10 +77,12 @@
 /* search·text 입력칸의 기본 상자 계산이 달라 너비가 어긋나지 않게 맞춘다. */
 .find-input {
   box-sizing: border-box;
-  flex: 1;
-  min-width: 64px;
-  max-width: 320px;
+  grid-column: 2;
+  width: auto;
+  min-width: 0;
+  justify-self: stretch;
   height: var(--control-height);
+  margin-left: var(--space-1);
   padding: 0 var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -88,7 +98,6 @@
 }
 
 .find-count {
-  flex: none;
   min-width: 40px;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
@@ -99,12 +108,7 @@
 
 .find-buttons {
   display: flex;
-  flex: none;
   gap: var(--space-0-5);
-}
-
-.find-close {
-  margin-left: auto;
 }
 
 /* 일치 강조(본문 꾸밈). .find-flash는 검색 결과로 연 자리의 1.5초 강조(S-05, 깜빡이지 않는다). 줄 높이를 바꾸지 않게 안쪽 여백 없음. 안의 코드 강조·링크 색은 덮는다(밑줄은 남긴다). */
@@ -362,11 +366,45 @@
   line-height: 1.6;
   tab-size: var(--code-tab-size, 2);
   overflow-x: auto;
+  color: var(--code-text);
 }
 
 .editor-body pre code {
   font-family: inherit;
   white-space: pre;
+}
+
+/* 문법 강조(F-02.4, S-06): lowlight가 붙인 hljs 클래스를 --code-* 7색에 묶는다. 라이트·다크는 토큰이 바꾼다.
+   여기 없는 클래스는 --code-text. 기울임꼴은 쓰지 않는다.
+   :where로 우선순위를 0으로 둬 찾기 일치(.find-match *)가 강조 색을 덮게 한다.
+   한 span에 클래스가 여럿 붙으면(예: hljs-meta hljs-string) 뒤 규칙이 이긴다. 순서를 바꾸지 않는다. */
+
+:where(.editor-body) :where(.hljs-comment, .hljs-quote) {
+  color: var(--code-comment);
+}
+
+:where(.editor-body) :where(.hljs-keyword, .hljs-doctag, .hljs-meta, .hljs-template-tag, .hljs-variable.language_, .hljs-selector-pseudo) {
+  color: var(--code-keyword);
+}
+
+:where(.editor-body) :where(.hljs-string, .hljs-regexp, .hljs-addition) {
+  color: var(--code-string);
+}
+
+:where(.editor-body) :where(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet) {
+  color: var(--code-number);
+}
+
+:where(.editor-body) :where(.hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-selector-class, .hljs-selector-id) {
+  color: var(--code-function);
+}
+
+:where(.editor-body) :where(.hljs-type, .hljs-built_in, .hljs-name, .hljs-selector-tag, .hljs-title.class_) {
+  color: var(--code-type);
+}
+
+:where(.editor-body) :where(.hljs-strong, .hljs-section) {
+  font-weight: var(--weight-semibold);
 }
 
 /* 코드 블록 노드 뷰: 틀(div) 안에 복사 버튼과 pre. 버튼이 pre 밖이라 가로 스크롤해도 제자리다(S-06, P6-4). */
@@ -613,9 +651,10 @@
   position: relative;
 }
 
+/* 본문 위에만 뜨면 된다. z-sticky로 두면 DOM이 뒤라 스크롤 때 도구 막대·찾기 막대 위에 그려지고 눌린다(P7-5). */
 .block-handle {
   position: absolute;
-  z-index: var(--z-sticky);
+  z-index: 1;
   display: flex;
   gap: var(--space-0-5);
   animation: block-handle-in var(--duration-fast) var(--ease-out);

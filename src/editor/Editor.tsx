@@ -28,7 +28,6 @@ import { useLinkMenu } from "./LinkMenu";
 import { FindExtension } from "./find";
 import { FindBar } from "./FindBar";
 import type { ToastData } from "../app/Toast";
-import "highlight.js/styles/github.css";
 import "./Editor.css";
 
 /** 빈 문서 기본값(DB 계약과 같은 값). */
