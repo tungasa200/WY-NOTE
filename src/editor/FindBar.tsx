@@ -93,6 +93,7 @@ export function FindBar({ editor, onToast }: { editor: Editor; onToast?: (t: Toa
 
   const close = () => {
     cancelTyping();
+    if (findSession.open) holdScroll();
     findSession.open = false;
     setOpen(false);
     clearFind(editor.view);
@@ -122,6 +123,7 @@ export function FindBar({ editor, onToast }: { editor: Editor; onToast?: (t: Toa
       go(c === "next" ? 1 : -1);
       return;
     }
+    if (!wasOpen || (c === "replace" && !findSession.expanded)) holdScroll();
     findSession.open = true;
     setOpen(true);
     if (c === "replace") {
@@ -155,18 +157,30 @@ export function FindBar({ editor, onToast }: { editor: Editor; onToast?: (t: Toa
 
   useEffect(() => () => clearTimeout(typing.current), []);
 
-  // 막대가 생기거나 높이가 바뀌어도 보이던 글이 밀리지 않게 스크롤을 그만큼 맞춘다(머리가 붙어 있을 때만).
-  // 지금 일치로 옮기는 스크롤(아래 효과)보다 먼저 한다.
-  const height = useRef(0);
+  // 막대를 열고 닫거나 바꾸기 줄을 펴고 접어도 보이던 글이 밀리지 않게(S-14), 바뀌기 전 본문 위치를 재 두고
+  // 바뀐 뒤 실제로 움직인 만큼 스크롤을 되돌린다. 브라우저 scroll anchoring이 따로 보정하면 두 번 움직이므로
+  // 그동안만 끄고 두 프레임 뒤 되살린다. 맨 위(0)·문서 끝처럼 스크롤로 다 못 맞추는 몫은 그대로 둔다.
+  const hold = useRef<{ scroller: HTMLElement; top: number } | null>(null);
+  const holdScroll = () => {
+    if (hold.current || editor.isDestroyed) return;
+    const scroller = editor.view.dom.closest<HTMLElement>(".content");
+    if (!scroller) return;
+    scroller.style.overflowAnchor = "none";
+    hold.current = { scroller, top: editor.view.dom.getBoundingClientRect().top };
+  };
+  // 지금 일치로 옮기는 스크롤(아래 효과)보다 먼저 한다. 높이가 안 바뀌는 렌더도 있어 의존성 없이 돈다.
   useLayoutEffect(() => {
-    const next = open ? (barRef.current?.offsetHeight ?? 0) : 0;
-    const diff = next - height.current;
-    height.current = next;
-    const scroller = editor.isDestroyed ? null : editor.view.dom.closest(".content");
-    const toolbar = scroller?.querySelector(".editor-toolbar");
-    if (!diff || !scroller || !toolbar || scroller.scrollTop <= 0) return;
-    if (toolbar.getBoundingClientRect().top <= scroller.getBoundingClientRect().top + 1) scroller.scrollTop += diff;
-  }, [open, expanded, editor]);
+    const h = hold.current;
+    if (!h) return;
+    hold.current = null;
+    if (!editor.isDestroyed) h.scroller.scrollTop += editor.view.dom.getBoundingClientRect().top - h.top;
+    // 그 사이 또 바뀌면(연달아 펴고 접기) 뒤 변경이 되살린다.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!hold.current) h.scroller.style.removeProperty("overflow-anchor");
+      }),
+    );
+  });
 
   useLayoutEffect(() => {
     const p = pending.current;
@@ -249,6 +263,7 @@ export function FindBar({ editor, onToast }: { editor: Editor; onToast?: (t: Toa
   };
 
   const toggle = () => {
+    holdScroll();
     findSession.expanded = !expanded;
     setExpanded(!expanded);
   };
