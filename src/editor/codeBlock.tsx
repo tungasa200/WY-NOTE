@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import CodeBlockLowlight, { type CodeBlockLowlightOptions } from "@tiptap/extension-code-block-lowlight";
+import { codeHighlightPlugin } from "./codeHighlight";
 import { Icon } from "./icons";
 
 type Options = CodeBlockLowlightOptions & {
@@ -74,5 +75,13 @@ export const CodeBlock = CodeBlockLowlight.extend<Options>({
   },
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockView);
+  },
+  addProseMirrorPlugins() {
+    // 부모의 강조 플러그인(키 "lowlight$")은 키마다 모든 코드 블록을 다시 강조하므로 빼고, 바뀐 블록만 강조하는 것으로 바꾼다(P7-4).
+    // 키 이름은 TipTap 내부 값이라, 판 올림으로 못 찾게 되면 개발 실행에서 바로 알린다(그대로 두면 강조가 두 번 돈다).
+    const all = this.parent?.() ?? [];
+    const parent = all.filter((p) => !(p.spec.key as unknown as { key?: string } | undefined)?.key?.startsWith("lowlight$"));
+    if (import.meta.env.DEV && parent.length === all.length) console.error("코드 강조: 부모 lowlight 플러그인을 찾지 못함(P7-4)");
+    return [...parent, codeHighlightPlugin({ name: this.name, lowlight: this.options.lowlight, defaultLanguage: this.options.defaultLanguage })];
   },
 });
