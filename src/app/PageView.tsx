@@ -5,6 +5,7 @@ import { Editor, type EditorInstance } from "../editor/Editor";
 import { imageExt } from "../editor/image";
 import type { JSONContent, Page } from "../lib/db-types";
 import type { ToastData } from "./Toast";
+import { keepUndo, restoreUndo } from "./undoKeep";
 
 /** 편집 영역에 연 페이지. 이름은 트리가 원본이라 본문만 든다. */
 export type OpenPage = Pick<Page, "id" | "content">;
@@ -27,6 +28,12 @@ export function PageView({ page, title, focusTitle, onTitleChange, onContentChan
   // 이미지를 이 페이지의 첨부로 저장하고 파일 이름을 받는다(F-02.6). 형식·크기는 편집기가 먼저 거른다(P3-5).
   const uploadImage = async (file: File) =>
     (await api.saveAttachment(page.id, imageExt(file.type), new Uint8Array(await file.arrayBuffer()))).fileName;
+  // 실행 취소 기록은 페이지마다 따로 둔다(F-03): 편집기가 떨어질 때 맡기고, 다시 붙을 때 돌려받는다.
+  const editorChanged = (editor: EditorInstance, attached: boolean) => {
+    if (attached) restoreUndo(page.id, editor);
+    else keepUndo(page.id, editor);
+    onEditor?.(editor, attached);
+  };
 
   return (
     <article className="page">
@@ -53,7 +60,7 @@ export function PageView({ page, title, focusTitle, onTitleChange, onContentChan
           content={page.content}
           onChange={onContentChange}
           autofocus={focusTitle ? false : "end"}
-          onEditor={onEditor}
+          onEditor={editorChanged}
           onNotify={onNotify}
           onToast={onToast}
           onImageUpload={uploadImage}
